@@ -474,13 +474,16 @@ function simpanLaporanGambar(){
     .filter(x => x.tanggal.slice(0,7) === bulan)
     .sort((a,b) => a.tanggal.localeCompare(b.tanggal));
 
-  const masuk = transaksi
-    .filter(x => x.jenis === "masuk")
-    .reduce((t,x) => t + Number(x.jumlah),0);
+  const dataMasuk = transaksi.filter(x => x.jenis === "masuk");
+  const dataKeluar = transaksi.filter(x => x.jenis === "keluar");
 
-  const keluar = transaksi
-    .filter(x => x.jenis === "keluar")
-    .reduce((t,x) => t + Number(x.jumlah),0);
+  const masuk = dataMasuk.reduce(
+    (t,x) => t + Number(x.jumlah),0
+  );
+
+  const keluar = dataKeluar.reduce(
+    (t,x) => t + Number(x.jumlah),0
+  );
 
   const saldo = masuk - keluar;
 
@@ -517,26 +520,37 @@ function simpanLaporanGambar(){
     return hasil;
   }
 
-  const detail = transaksi.map(x => {
-    const baris = bungkus(
-      x.keterangan,
-      "22px Arial",
-      440
-    );
+  function siapkanDetail(data){
+    return data.map(x => {
+      const baris = bungkus(
+        x.keterangan,
+        "22px Arial",
+        440
+      );
 
-    return {
-      ...x,
-      baris,
-      tinggi: Math.max(76,baris.length * lineHeight + 30)
-    };
-  });
+      return {
+        ...x,
+        baris,
+        tinggi: Math.max(76,baris.length * lineHeight + 30)
+      };
+    });
+  }
 
-  const tinggiTabel = detail.reduce(
-    (total,x) => total + x.tinggi,0
+  const detailMasuk = siapkanDetail(dataMasuk);
+  const detailKeluar = siapkanDetail(dataKeluar);
+
+  const tinggiIsi = detailMasuk.reduce(
+    (t,x) => t + x.tinggi,0
+  ) + detailKeluar.reduce(
+    (t,x) => t + x.tinggi,0
   );
 
+  // Tinggi gambar menyesuaikan jumlah transaksi
+  const tinggiTetap = 190 + 45 + 145 + 45 + 65 +
+    (2 * (65 + 65 + 70)) + 90;
+
   canvas.width = W;
-  canvas.height = 570 + tinggiTabel + 130;
+  canvas.height = tinggiTetap + tinggiIsi;
 
   // Latar
   ctx.fillStyle = "#f1f5f9";
@@ -586,104 +600,144 @@ function simpanLaporanGambar(){
     ctx.fillText(rupiah(k[1]),x+25,370);
   });
 
-  // Judul tabel
   let y = 465;
 
+  // Fungsi menggambar tabel masuk dan keluar
+  function gambarTabel(judul,detail,total,warna,jenis){
+
+    // Judul bagian
+    ctx.fillStyle = warna;
+    ctx.fillRect(P,y,tableWidth,65);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 27px Arial";
+    ctx.fillText(judul,P+20,y+42);
+
+    y += 65;
+
+    // Header kolom
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(P,y,tableWidth,65);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 21px Arial";
+
+    ctx.fillText("TANGGAL",P+15,y+41);
+    ctx.fillText("KETERANGAN",P+195,y+41);
+
+    ctx.textAlign = "right";
+    ctx.fillText("JUMLAH",W-P-15,y+41);
+    ctx.textAlign = "left";
+
+    y += 65;
+
+    // Jika belum ada transaksi
+    if(detail.length === 0){
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(P,y,tableWidth,80);
+
+      ctx.fillStyle = "#64748b";
+      ctx.font = "22px Arial";
+      ctx.fillText(
+        "Belum ada transaksi kas " + jenis + ".",
+        P+20,y+48
+      );
+
+      y += 80;
+    }
+
+    // Isi transaksi
+    detail.forEach((item,index) => {
+      const h = item.tinggi;
+
+      ctx.fillStyle = index % 2 === 0
+        ? "#ffffff" : "#f8fafc";
+
+      ctx.fillRect(P,y,tableWidth,h);
+
+      ctx.fillStyle = "#334155";
+      ctx.font = "20px Arial";
+      ctx.fillText(item.tanggal,P+15,y+43);
+
+      ctx.font = "22px Arial";
+
+      item.baris.forEach((baris,i) => {
+        ctx.fillText(
+          baris,
+          P+195,
+          y+35+i*lineHeight
+        );
+      });
+
+      ctx.fillStyle = warna;
+      ctx.font = "bold 19px Arial";
+      ctx.textAlign = "right";
+
+      ctx.fillText(
+        rupiah(item.jumlah),
+        W-P-15,
+        y+43
+      );
+
+      ctx.textAlign = "left";
+
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.beginPath();
+      ctx.moveTo(P,y+h);
+      ctx.lineTo(W-P,y+h);
+      ctx.stroke();
+
+      y += h;
+    });
+
+    // Total masing-masing tabel
+    ctx.fillStyle = warna;
+    ctx.fillRect(P,y,tableWidth,70);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 23px Arial";
+    ctx.fillText(
+      "TOTAL KAS " + jenis.toUpperCase(),
+      P+20,y+44
+    );
+
+    ctx.textAlign = "right";
+    ctx.fillText(
+      rupiah(total),
+      W-P-20,y+44
+    );
+    ctx.textAlign = "left";
+
+    y += 90;
+  }
+
+  // Tabel kas masuk
+  gambarTabel(
+    "RIWAYAT TRANSAKSI KAS MASUK",
+    detailMasuk,
+    masuk,
+    "#15803d",
+    "masuk"
+  );
+
+  // Tabel kas keluar
+  gambarTabel(
+    "RIWAYAT TRANSAKSI KAS KELUAR",
+    detailKeluar,
+    keluar,
+    "#dc2626",
+    "keluar"
+  );
+
+  // Footer
   ctx.fillStyle = "#1e40af";
   ctx.fillRect(P,y,tableWidth,65);
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 21px Arial";
-
-  ctx.fillText("TANGGAL",P+15,y+41);
-  ctx.fillText("JENIS",P+195,y+41);
-  ctx.fillText("KETERANGAN",P+355,y+41);
-
-  ctx.textAlign = "right";
-  ctx.fillText("JUMLAH",W-P-15,y+41);
-  ctx.textAlign = "left";
-
-  y += 65;
-
-  if(detail.length === 0){
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(P,y,tableWidth,100);
-
-    ctx.fillStyle = "#64748b";
-    ctx.font = "23px Arial";
-    ctx.fillText(
-      "Belum ada transaksi pada bulan ini.",
-      P+20,y+60
-    );
-
-    y += 100;
-  }
-
-  // Isi tabel
-  detail.forEach((item,index) => {
-    const h = item.tinggi;
-
-    ctx.fillStyle = index % 2 === 0
-      ? "#ffffff" : "#f8fafc";
-
-    ctx.fillRect(P,y,tableWidth,h);
-
-    ctx.fillStyle = "#334155";
-    ctx.font = "20px Arial";
-    ctx.fillText(item.tanggal,P+15,y+43);
-
-    ctx.fillStyle = item.jenis === "masuk"
-      ? "#15803d" : "#dc2626";
-
-    ctx.font = "bold 20px Arial";
-    ctx.fillText(
-      item.jenis === "masuk" ? "Masuk" : "Keluar",
-      P+195,y+43
-    );
-
-    ctx.fillStyle = "#334155";
-    ctx.font = "22px Arial";
-
-    item.baris.forEach((baris,i) => {
-      ctx.fillText(
-        baris,
-        P+355,
-        y+35+i*lineHeight
-      );
-    });
-
-    ctx.fillStyle = item.jenis === "masuk"
-      ? "#15803d" : "#dc2626";
-
-    ctx.font = "bold 19px Arial";
-    ctx.textAlign = "right";
-
-    ctx.fillText(
-      rupiah(item.jumlah),
-      W-P-15,
-      y+43
-    );
-
-    ctx.textAlign = "left";
-
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.beginPath();
-    ctx.moveTo(P,y+h);
-    ctx.lineTo(W-P,y+h);
-    ctx.stroke();
-
-    y += h;
-  });
-
-  // Footer
-  ctx.fillStyle = "#1e40af";
-  ctx.fillRect(P,y+25,tableWidth,65);
-
-  ctx.fillStyle = "#ffffff";
   ctx.font = "bold 22px Arial";
   ctx.fillText(
-    "JUMLAH TRANSAKSI: " + transaksi.length,
-    P+20,y+66
+    "JUMLAH SELURUH TRANSAKSI: " + transaksi.length,
+    P+20,y+42
   );
 
   // Simpan PNG
@@ -704,8 +758,8 @@ function simpanLaporanGambar(){
 
     alert("Laporan gambar berhasil dibuat!");
   },"image/png");
-  }
-  
+          }
+        
   
 function restoreData(event){
 const file = event.target.files[0];
