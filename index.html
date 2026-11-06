@@ -60,8 +60,18 @@ th,td{border:1px solid #ccc}
 <div class="container">
 
 <header>
-<h1>Laporan Kas Bulanan</h1>
+<h1 id="judulKas">Laporan Kas Bulanan</h1>
 <p>Catatan pemasukan dan pengeluaran kas</p>
+
+<div class="no-print" style="margin-top:15px">
+    <label for="namaKas">Nama Kas / Kelompok</label>
+    <input
+        type="text"
+        id="namaKas"
+        placeholder="Contoh: KAS KELOMPOK ELANG"
+        style="width:100%;padding:12px;margin-top:6px"
+    >
+</div>
 
 <button id="installButton" style="display:none;background:#2563eb;margin-top:12px">
 📲 Instal Aplikasi
