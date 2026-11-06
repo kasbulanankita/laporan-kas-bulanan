@@ -174,19 +174,24 @@ maximumFractionDigits:0
 }).format(angka);
 
 function simpan(){
-  const data = JSON.stringify(dataKas);
+  const dataLama = localStorage.getItem("dataKasBulanan");
 
-  // Simpan data utama
-  localStorage.setItem("dataKasBulanan", data);
+  // Simpan data lama sebagai backup sebelum diperbarui
+  if(dataLama){
+    localStorage.setItem("backupOtomatisKas", dataLama);
 
-  // Simpan backup otomatis
-  localStorage.setItem("backupOtomatisKas", data);
+    localStorage.setItem(
+      "waktuBackupOtomatis",
+      new Date().toISOString()
+    );
+  }
 
-  // Catat waktu backup
+  // Simpan data terbaru
   localStorage.setItem(
-    "waktuBackupOtomatis",
-    new Date().toISOString()
+    "dataKasBulanan",
+    JSON.stringify(dataKas)
   );
+
   tampilkanStatusBackup();
 }
 function tampilkanStatusBackup(){
