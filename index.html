@@ -178,7 +178,13 @@ localStorage.getItem("dataKasBulanan") || "[]"
 );
 
 let idEdit = null;
+// Ambil nama kas yang tersimpan
+$("namaKas").value = localStorage.getItem("namaKas") || "";
 
+// Simpan nama kas otomatis saat diketik
+$("namaKas").addEventListener("input", function(){
+  localStorage.setItem("namaKas", this.value);
+});
 const rupiah = angka => new Intl.NumberFormat("id-ID", {
 style:"currency",
 currency:"IDR",
