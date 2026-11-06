@@ -461,6 +461,7 @@ function pulihkanBackupOtomatis(){
   }
   }
   
+
 function simpanLaporanGambar(){
   const bulan = $("bulan").value;
 
@@ -475,132 +476,217 @@ function simpanLaporanGambar(){
 
   const masuk = transaksi
     .filter(x => x.jenis === "masuk")
-    .reduce((total,x) => total + Number(x.jumlah), 0);
+    .reduce((t,x) => t + Number(x.jumlah),0);
 
   const keluar = transaksi
     .filter(x => x.jenis === "keluar")
-    .reduce((total,x) => total + Number(x.jumlah), 0);
+    .reduce((t,x) => t + Number(x.jumlah),0);
 
   const saldo = masuk - keluar;
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  const lebar = 1200;
-  const padding = 65;
-  const tinggiBaris = 76;
-  const tinggiAwal = 620;
+  const W = 1200;
+  const P = 65;
+  const tableWidth = W - P * 2;
+  const lineHeight = 32;
 
-  canvas.width = lebar;
-  canvas.height = tinggiAwal +
-    (transaksi.length * tinggiBaris) + 100;
+  function rupiah(n){
+    return "Rp " + Number(n).toLocaleString("id-ID");
+  }
 
-  // Latar gambar
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  function bungkus(teks,font,maxWidth){
+    ctx.font = font;
+    const kata = String(teks).split(" ");
+    const hasil = [];
+    let baris = "";
 
-  // Judul
+    kata.forEach(k => {
+      const calon = baris ? baris + " " + k : k;
+
+      if(ctx.measureText(calon).width > maxWidth && baris){
+        hasil.push(baris);
+        baris = k;
+      }else{
+        baris = calon;
+      }
+    });
+
+    if(baris) hasil.push(baris);
+    return hasil;
+  }
+
+  const detail = transaksi.map(x => {
+    const baris = bungkus(
+      x.keterangan,
+      "22px Arial",
+      440
+    );
+
+    return {
+      ...x,
+      baris,
+      tinggi: Math.max(76,baris.length * lineHeight + 30)
+    };
+  });
+
+  const tinggiTabel = detail.reduce(
+    (total,x) => total + x.tinggi,0
+  );
+
+  canvas.width = W;
+  canvas.height = 570 + tinggiTabel + 130;
+
+  // Latar
+  ctx.fillStyle = "#f1f5f9";
+  ctx.fillRect(0,0,W,canvas.height);
+
+  // Header
   ctx.fillStyle = "#1e40af";
+  ctx.fillRect(0,0,W,190);
+
+  ctx.fillStyle = "#ffffff";
   ctx.font = "bold 48px Arial";
-  ctx.fillText("LAPORAN KAS BULANAN",padding,90);
+  ctx.fillText("LAPORAN KAS BULANAN",P,85);
 
-  ctx.fillStyle = "#555555";
-  ctx.font = "28px Arial";
-  ctx.fillText("Periode: " + bulan, padding,140);
+  ctx.font = "26px Arial";
+  ctx.fillText("Laporan keuangan periode " + bulan,P,135);
 
-  ctx.font = "22px Arial";
+  // Tanggal cetak
+  ctx.fillStyle = "#475569";
+  ctx.font = "20px Arial";
   ctx.fillText(
     "Dicetak: " + new Date().toLocaleString("id-ID"),
-    padding,185
+    P,235
   );
 
   // Ringkasan
-  function rupiah(angka){
-    return "Rp " + angka.toLocaleString("id-ID");
-  }
-
-  const ringkasan = [
+  const kartu = [
     ["TOTAL PEMASUKAN",masuk,"#15803d"],
     ["TOTAL PENGELUARAN",keluar,"#dc2626"],
     ["SALDO AKHIR",saldo,"#1d4ed8"]
   ];
 
-  ringkasan.forEach((item,i) => {
-    const x = padding + i * 365;
+  kartu.forEach((k,i) => {
+    const x = P + i * 365;
 
-    ctx.fillStyle = "#f1f5f9";
-    ctx.fillRect(x,220,335,145);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x,275,335,145);
 
-    ctx.fillStyle = "#444444";
-    ctx.font = "bold 22px Arial";
-    ctx.fillText(item[0],x+20,260);
+    ctx.fillStyle = k[2];
+    ctx.fillRect(x,275,8,145);
 
-    ctx.fillStyle = item[2];
-    ctx.font = "bold 30px Arial";
-    ctx.fillText(rupiah(item[1]),x+20,320);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "bold 19px Arial";
+    ctx.fillText(k[0],x+25,315);
+
+    ctx.fillStyle = k[2];
+    ctx.font = "bold 27px Arial";
+    ctx.fillText(rupiah(k[1]),x+25,370);
   });
 
   // Judul tabel
-  let y = 420;
+  let y = 465;
 
   ctx.fillStyle = "#1e40af";
-  ctx.fillRect(padding,y,1070,65);
+  ctx.fillRect(P,y,tableWidth,65);
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 22px Arial";
+  ctx.font = "bold 21px Arial";
 
-  ctx.fillText("TANGGAL",padding+15,y+40);
-  ctx.fillText("JENIS",padding+210,y+40);
-  ctx.fillText("KETERANGAN",padding+390,y+40);
+  ctx.fillText("TANGGAL",P+15,y+41);
+  ctx.fillText("JENIS",P+195,y+41);
+  ctx.fillText("KETERANGAN",P+355,y+41);
+
   ctx.textAlign = "right";
-  ctx.fillText("JUMLAH",padding+1040,y+40);
+  ctx.fillText("JUMLAH",W-P-15,y+41);
   ctx.textAlign = "left";
 
   y += 65;
 
-  if(transaksi.length === 0){
-    ctx.fillStyle = "#555555";
-    ctx.font = "26px Arial";
-    ctx.fillText("Belum ada transaksi pada bulan ini.",padding+15,y+55);
+  if(detail.length === 0){
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(P,y,tableWidth,100);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "23px Arial";
+    ctx.fillText(
+      "Belum ada transaksi pada bulan ini.",
+      P+20,y+60
+    );
+
+    y += 100;
   }
 
-  transaksi.forEach((item,index) => {
-    ctx.fillStyle = index % 2 === 0 ? "#f8fafc" : "#ffffff";
-    ctx.fillRect(padding,y,1070,tinggiBaris);
+  // Isi tabel
+  detail.forEach((item,index) => {
+    const h = item.tinggi;
 
-    ctx.fillStyle = "#222222";
-    ctx.font = "21px Arial";
+    ctx.fillStyle = index % 2 === 0
+      ? "#ffffff" : "#f8fafc";
 
-    ctx.fillText(item.tanggal,padding+15,y+45);
+    ctx.fillRect(P,y,tableWidth,h);
+
+    ctx.fillStyle = "#334155";
+    ctx.font = "20px Arial";
+    ctx.fillText(item.tanggal,P+15,y+43);
 
     ctx.fillStyle = item.jenis === "masuk"
       ? "#15803d" : "#dc2626";
 
+    ctx.font = "bold 20px Arial";
     ctx.fillText(
       item.jenis === "masuk" ? "Masuk" : "Keluar",
-      padding+210,y+45
+      P+195,y+43
     );
 
-    ctx.fillStyle = "#222222";
-    ctx.fillText(
-      item.keterangan.substring(0,28),
-      padding+390,y+45
-    );
+    ctx.fillStyle = "#334155";
+    ctx.font = "22px Arial";
 
+    item.baris.forEach((baris,i) => {
+      ctx.fillText(
+        baris,
+        P+355,
+        y+35+i*lineHeight
+      );
+    });
+
+    ctx.fillStyle = item.jenis === "masuk"
+      ? "#15803d" : "#dc2626";
+
+    ctx.font = "bold 19px Arial";
     ctx.textAlign = "right";
+
     ctx.fillText(
-      rupiah(Number(item.jumlah)),
-      padding+1040,y+45
+      rupiah(item.jumlah),
+      W-P-15,
+      y+43
     );
+
     ctx.textAlign = "left";
 
     ctx.strokeStyle = "#e2e8f0";
-    ctx.strokeRect(padding,y,1070,tinggiBaris);
+    ctx.beginPath();
+    ctx.moveTo(P,y+h);
+    ctx.lineTo(W-P,y+h);
+    ctx.stroke();
 
-    y += tinggiBaris;
+    y += h;
   });
 
-  // Unduh gambar
+  // Footer
+  ctx.fillStyle = "#1e40af";
+  ctx.fillRect(P,y+25,tableWidth,65);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 22px Arial";
+  ctx.fillText(
+    "JUMLAH TRANSAKSI: " + transaksi.length,
+    P+20,y+66
+  );
+
+  // Simpan PNG
   canvas.toBlob(function(blob){
     if(!blob){
       alert("Gambar gagal dibuat.");
@@ -614,11 +700,12 @@ function simpanLaporanGambar(){
     link.download = "Laporan-Kas-" + bulan + ".png";
     link.click();
 
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url),2000);
 
-    alert("Gambar laporan berhasil dibuat!");
+    alert("Laporan gambar berhasil dibuat!");
   },"image/png");
-}
+  }
+  
   
 function restoreData(event){
 const file = event.target.files[0];
