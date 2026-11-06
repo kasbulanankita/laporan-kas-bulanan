@@ -465,8 +465,20 @@ let deferredPrompt;
 
 const installButton = document.getElementById("installButton");
 
+const isInstalled =
+  localStorage.getItem("kasAppInstalled") === "true" ||
+  window.matchMedia("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
+
+if (isInstalled) {
+  installButton.style.display = "none";
+}
+
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
+
+  if (isInstalled) return;
+
   deferredPrompt = event;
   installButton.style.display = "block";
 });
@@ -474,15 +486,22 @@ window.addEventListener("beforeinstallprompt", (event) => {
 installButton.addEventListener("click", async () => {
   if (!deferredPrompt) return;
 
-  deferredPrompt.prompt();
-
-  await deferredPrompt.userChoice;
-
+  const promptEvent = deferredPrompt;
   deferredPrompt = null;
+
+  promptEvent.prompt();
+
+  const result = await promptEvent.userChoice;
+
+  if (result.outcome === "accepted") {
+    localStorage.setItem("kasAppInstalled", "true");
+  }
+
   installButton.style.display = "none";
 });
 
 window.addEventListener("appinstalled", () => {
+  localStorage.setItem("kasAppInstalled", "true");
   installButton.style.display = "none";
   deferredPrompt = null;
 });
