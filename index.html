@@ -460,6 +460,32 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+<script>
+let deferredPrompt;
 
+const installButton = document.getElementById("installButton");
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredPrompt = event;
+  installButton.style.display = "block";
+});
+
+installButton.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+
+  deferredPrompt.prompt();
+
+  await deferredPrompt.userChoice;
+
+  deferredPrompt = null;
+  installButton.style.display = "none";
+});
+
+window.addEventListener("appinstalled", () => {
+  installButton.style.display = "none";
+  deferredPrompt = null;
+});
+</script>
 </body>
 </html>
