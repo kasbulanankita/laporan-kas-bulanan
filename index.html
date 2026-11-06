@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laporan Kas Bulanan</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:16px;color:#1e293b}
+.container{max-width:700px;margin:auto}
+header{background:#14532d;color:white;padding:22px;border-radius:14px;text-align:center}
+header h1{margin:0 0 8px;font-size:24px}
+.card{background:white;padding:18px;border-radius:12px;margin-top:16px;box-shadow:0 2px 8px #0000000d}
+h2{font-size:18px;margin-top:0}
+input,select,button{width:100%;padding:12px;margin:6px 0;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+button{background:#15803d;color:white;border:0;font-weight:bold;cursor:pointer}
+button.delete{background:#dc2626}
+button.export{background:#2563eb}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.summary div{padding:12px 8px;border-radius:10px;background:#ecfdf5;text-align:center;overflow-wrap:anywhere}
+.summary div:nth-child(2){background:#fef2f2}
+.summary div:nth-child(3){background:#eff6ff}
+.summary small{display:block;font-size:12px;margin-bottom:7px}
+.summary strong{font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 5px;border-bottom:1px solid #e2e8f0;text-align:left}
+th{background:#f8fafc}
+.table-wrap{overflow-x:auto}
+.income{color:#15803d;font-weight:bold}
+.expense{color:#dc2626;font-weight:bold}
+.empty{text-align:center;color:#64748b;padding:20px}
+@media(max-width:420px){.summary{grid-template-columns:1fr}.summary div{display:flex;justify-content:space-between;align-items:center}.summary small{margin:0}.summary strong{font-size:15px}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>Laporan Kas Bulanan</h1>
+<p>Catatan pemasukan dan pengeluaran kas</p>
+</header>
+
+<div class="card">
+<h2>Pilih Bulan</h2>
+<input type="month" id="bulan">
+</div>
+
+<div class="card">
+<h2>Ringkasan Kas</h2>
+<div class="summary">
+<div><small>Total Pemasukan</small><strong id="totalMasuk">Rp0</strong></div>
+<div><small>Total Pengeluaran</small><strong id="totalKeluar">Rp0</strong></div>
+<div><small>Saldo Akhir</small><strong id="saldo">Rp0</strong></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Tambah Transaksi</h2>
+<form id="formKas">
+<input type="date" id="tanggal" required>
+<select id="jenis" required>
+<option value="masuk">Pemasukan</option>
+<option value="keluar">Pengeluaran</option>
+</select>
+<input type="text" id="keterangan" placeholder="Keterangan transaksi" required>
+<input type="number" id="jumlah" placeholder="Jumlah uang (Rp)" min="1" required>
+<button type="submit">Simpan Transaksi</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Riwayat Transaksi</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+<tbody id="daftarKas"></tbody>
+</table>
+</div>
+<p id="kosong" class="empty">Belum ada transaksi bulan ini.</p>
+<button class="export" onclick="eksporCSV()">Ekspor ke CSV</button>
+<button class="delete" onclick="hapusSemua()">Hapus Semua Data</button>
+</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let dataKas = JSON.parse(localStorage.getItem("dataKasBulanan") || "[]");
+
+const rupiah = angka => new Intl.NumberFormat("id-ID",{
+style:"currency",currency:"IDR",maximumFractionDigits:0
+}).format(angka);
+
+function simpan(){
+localStorage.setItem("dataKasBulanan",JSON.stringify(dataKas));
+}
+
+function tampilkan(){
+const bulan = $("bulan").value;
+const data = dataKas.filter(x=>x.tanggal.startsWith(bulan))
+.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+
+let masuk=0,keluar=0;
+data.forEach(x=>{
+if(x.jenis==="masuk") masuk+=x.jumlah;
+else keluar+=x.jumlah;
+});
+
+$("totalMasuk").textContent=rupiah(masuk);
+$("totalKeluar").textContent=rupiah(keluar);
+$("saldo").textContent=rupiah(masuk-keluar);
+$("daftarKas").innerHTML="";
+
+$("kosong").style.display=data.length?"none":"block";
+
+data.forEach(x=>{
+const tr=document.createElement("tr");
+const values=[
+x.tanggal,x.keterangan,
+x.jenis==="masuk"?"Masuk":"Keluar",
+rupiah(x.jumlah)
+];
+values.forEach((v,i)=>{
+const td=document.createElement("td");
+td.textContent=v;
+if(i===2) td.className=x.jenis==="masuk"?"income":"expense";
+tr.appendChild(td);
+});
+const td=document.createElement("td");
+const btn=document.createElement("button");
+btn.textContent="Hapus";
+btn.className="delete";
+btn.style.padding="7px";
+btn.onclick=()=>hapusSatu(x.id);
+td.appendChild(btn);
+tr.appendChild(td);
+$("daftarKas").appendChild(tr);
+});
+}
+
+$("formKas").addEventListener("submit",e=>{
+e.preventDefault();
+const tanggal=$("tanggal").value;
+const keterangan=$("keterangan").value.trim();
+const jumlah=Number($("jumlah").value);
+if(!tanggal||!keterangan||jumlah<=0)return;
+
+dataKas.push({
+id:Date.now(),
+tanggal,
+jenis:$("jenis").value,
+keterangan,
+jumlah
+});
+simpan();
+$("formKas").reset();
+$("tanggal").value=new Date().toLocaleDateString("en-CA");
+tampilkan();
+});
+
+function hapusSatu(id){
+if(!confirm("Hapus transaksi ini?"))return;
+dataKas=dataKas.filter(x=>x.id!==id);
+simpan();
+tampilkan();
+}
+
+function hapusSemua(){
+if(!confirm("Yakin ingin menghapus seluruh data kas?"))return;
+dataKas=[];
+simpan();
+tampilkan();
+}
+
+function eksporCSV(){
+const bulan=$("bulan").value;
+const data=dataKas.filter(x=>x.tanggal.startsWith(bulan));
+if(!data.length){alert("Belum ada data untuk diekspor.");return;}
+const rows=[["Tanggal","Keterangan","Jenis","Jumlah"],
+...data.map(x=>[x.tanggal,x.keterangan,x.jenis,x.jumlah])];
+const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+const url=URL.createObjectURL(blob);
+const a=document.createElement("a");
+a.href=url;
+a.download="laporan-kas-"+bulan+".csv";
+a.click();
+URL.revokeObjectURL(url);
+}
+
+$("bulan").value=new Date().toISOString().slice(0,7);
+$("tanggal").value=new Date().toLocaleDateString("en-CA");
+$("bulan").addEventListener("change",tampilkan);
+tampilkan();
+</script>
+</body>
+</html>
