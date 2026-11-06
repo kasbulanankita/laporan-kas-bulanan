@@ -382,6 +382,20 @@ month:"long",
 year:"numeric"
 });
 
+const namaKas = $("namaKas").value.trim() || "Laporan Kas";
+
+document.title = namaKas + " - " + namaBulan;
+window.print();
+}
+
+const [tahun, nomorBulan] = bulan.split("-");
+const namaBulan = new Date(
+Number(tahun), Number(nomorBulan)-1
+).toLocaleDateString("id-ID", {
+month:"long",
+year:"numeric"
+});
+
 document.title = "Laporan Kas " + namaBulan;
 window.print();
 }
