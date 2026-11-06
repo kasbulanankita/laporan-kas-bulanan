@@ -231,6 +231,7 @@ function simpan(){
 function tampilkanStatusBackup(){
   const waktu = localStorage.getItem("waktuBackupOtomatis");
   const status = $("statusBackup");
+  if (!status) return;
 
   if (!waktu) {
     status.textContent = "Backup otomatis belum dilakukan.";
@@ -404,46 +405,62 @@ document.title = namaKas + " - " + namaBulan;
 window.print();
 }
 
-const [tahun, nomorBulan] = bulan.split("-");
-const namaBulan = new Date(
-Number(tahun), Number(nomorBulan)-1
-).toLocaleDateString("id-ID", {
-month:"long",
-year:"numeric"
-});
-
-document.title = "Laporan Kas " + namaBulan;
-window.print();
-}
 
 function eksporCSV(){
-const bulan = $("bulan").value;
-const data = dataKas.filter(x => x.tanggal.startsWith(bulan));
+  const bulan = $("bulan").value;
+  if(!bulan){
+    alert("Pilih bulan terlebih dahulu.");
+    return;
+  }
 
-if(!data.length){
-alert("Belum ada data untuk diekspor.");
-return;
-}
+  const data = dataKas
+    .filter(x => x.tanggal.startsWith(bulan))
+    .sort((a,b) => a.tanggal.localeCompare(b.tanggal));
 
-const rows = [
-["Tanggal","Keterangan","Jenis","Jumlah"],
-...data.map(x => [x.tanggal,x.keterangan,x.jenis,x.jumlah])
-];
+  if(!data.length){
+    alert("Belum ada data untuk diekspor.");
+    return;
+  }
 
-const csv = rows.map(r =>
-r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(",")
-).join("\n");
+  const namaKas = $("namaKas").value.trim() || "Laporan Kas";
+  const [tahun, nomorBulan] = bulan.split("-");
+  const namaBulan = new Date(
+    Number(tahun), Number(nomorBulan)-1
+  ).toLocaleDateString("id-ID", {
+    month:"long",
+    year:"numeric"
+  });
 
-const blob = new Blob(["\uFEFF"+csv], {
-type:"text/csv;charset=utf-8;"
-});
+  const rows = [
+    ["Nama Kas / Kelompok", namaKas],
+    ["Periode", namaBulan],
+    [],
+    ["Tanggal","Keterangan","Jenis","Jumlah"],
+    ...data.map(x => [
+      x.tanggal,
+      x.keterangan,
+      x.jenis === "masuk" ? "Pemasukan" : "Pengeluaran",
+      x.jumlah
+    ])
+  ];
 
-const url = URL.createObjectURL(blob);
-const a = document.createElement("a");
-a.href = url;
-a.download = "laporan-kas-" + bulan + ".csv";
-a.click();
-URL.revokeObjectURL(url);
+  const csv = rows.map(r =>
+    r.map(v => '"' + String(v ?? "").replace(/"/g,'""') + '"').join(",")
+  ).join("\n");
+
+  const blob = new Blob(["\uFEFF"+csv], {
+    type:"text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const namaFile = namaKas.toLowerCase()
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/^-|-$/g,"") || "laporan-kas";
+  a.href = url;
+  a.download = namaFile + "-" + bulan + ".csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function backupData(){
@@ -515,6 +532,8 @@ function simpanLaporanGambar(){
     alert("Pilih bulan laporan terlebih dahulu.");
     return;
   }
+
+  const namaKas = $("namaKas").value.trim() || "Laporan Kas Bulanan";
 
   const transaksi = dataKas
     .filter(x => x.tanggal.slice(0,7) === bulan)
@@ -607,11 +626,20 @@ function simpanLaporanGambar(){
   ctx.fillRect(0,0,W,190);
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 48px Arial";
-  ctx.fillText("LAPORAN KAS BULANAN",P,85);
+  let ukuranJudul = 48;
+  ctx.font = "bold " + ukuranJudul + "px Arial";
+  while(ctx.measureText(namaKas.toUpperCase()).width > tableWidth && ukuranJudul > 24){
+    ukuranJudul -= 2;
+    ctx.font = "bold " + ukuranJudul + "px Arial";
+  }
+  ctx.fillText(namaKas.toUpperCase(),P,85);
 
+  const [tahunLaporan, bulanLaporan] = bulan.split("-");
+  const periodeLaporan = new Date(
+    Number(tahunLaporan), Number(bulanLaporan)-1
+  ).toLocaleDateString("id-ID", {month:"long",year:"numeric"});
   ctx.font = "26px Arial";
-  ctx.fillText("Laporan keuangan periode " + bulan,P,135);
+  ctx.fillText("LAPORAN KAS BULANAN • " + periodeLaporan,P,135);
 
   // Tanggal cetak
   ctx.fillStyle = "#475569";
@@ -797,139 +825,7 @@ function simpanLaporanGambar(){
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = "Laporan-Kas-" + bulan + ".png";
-    link.click();
-
-    setTimeout(() => URL.revokeObjectURL(url),2000);
-
-    alert("Laporan gambar berhasil dibuat!");
-  },"image/png");
-          }
-        
-  
-function restoreData(event){
-const file = event.target.files[0];
-if(!file) return;
-
-const reader = new FileReader();
-
-reader.onload = function(e){
-try{
-const cadangan = JSON.parse(e.target.result);
-
-if(
-!cadangan ||
-cadangan.aplikasi !== "Laporan Kas Bulanan" ||
-!Array.isArray(cadangan.transaksi)
-){
-throw new Error("Format file tidak sesuai.");
-}
-
-const valid = cadangan.transaksi.every(x =>
-x &&
-(x.id !== undefined && x.id !== null) &&
-typeof x.tanggal === "string" &&
-/^\d{4}-\d{2}-\d{2}$/.test(x.tanggal) &&
-["masuk","keluar"].includes(x.jenis) &&
-typeof x.keterangan === "string" &&
-x.keterangan.trim().length > 0 &&
-Number.isFinite(x.jumlah) &&
-x.jumlah > 0
-);
-
-if(!valid){
-throw new Error("Ada data transaksi yang tidak valid.");
-}
-
-if(!confirm(
-"File berisi " + cadangan.transaksi.length +
-" transaksi. Restore akan mengganti semua data saat ini. Lanjutkan?"
-)){
-return;
-}
-
-dataKas = cadangan.transaksi;
-simpan();
-batalEdit();
-tampilkan();
-
-alert("Restore berhasil! Data transaksi sudah dipulihkan.");
-
-}catch(err){
-alert("Restore gagal: " + err.message);
-}finally{
-$("fileRestore").value = "";
-}
-};
-
-reader.onerror = function(){
-alert("File tidak dapat dibaca.");
-$("fileRestore").value = "";
-};
-
-reader.readAsText(file);
-}
-
-$("bulan").value = new Date().toISOString().slice(0,7);
-$("tanggal").value = tanggalHariIni();
-$("bulan").addEventListener("change", tampilkan);
-
-tampilkan();
-</script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js")
-      .catch((error) => console.error("Service Worker gagal:", error));
-  });
-}
-</script>
-<script>
-let deferredPrompt;
-
-const installButton = document.getElementById("installButton");
-
-const isInstalled =
-  localStorage.getItem("kasAppInstalled") === "true" ||
-  window.matchMedia("(display-mode: standalone)").matches ||
-  window.navigator.standalone === true;
-
-if (isInstalled) {
-  installButton.style.display = "none";
-}
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-
-  if (isInstalled) return;
-
-  deferredPrompt = event;
-  installButton.style.display = "block";
-});
-
-installButton.addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-
-  const promptEvent = deferredPrompt;
-  deferredPrompt = null;
-
-  promptEvent.prompt();
-
-  const result = await promptEvent.userChoice;
-
-  if (result.outcome === "accepted") {
-    localStorage.setItem("kasAppInstalled", "true");
-  }
-
-  installButton.style.display = "none";
-});
-
-window.addEventListener("appinstalled", () => {
-  localStorage.setItem("kasAppInstalled", "true");
-  installButton.style.display = "none";
-  deferredPrompt = null;
-});
-</script>
-</body>
-</html>
+    const namaFile = namaKas.toLowerCase()
+      .replace(/[^a-z0-9]+/g,"-")
+      .replace(/^-|-$/g,"") || "laporan-kas";
+    link.download 
