@@ -167,7 +167,19 @@ maximumFractionDigits:0
 }).format(angka);
 
 function simpan(){
-localStorage.setItem("dataKasBulanan", JSON.stringify(dataKas));
+  const data = JSON.stringify(dataKas);
+
+  // Simpan data utama
+  localStorage.setItem("dataKasBulanan", data);
+
+  // Simpan backup otomatis
+  localStorage.setItem("backupOtomatisKas", data);
+
+  // Catat waktu backup
+  localStorage.setItem(
+    "waktuBackupOtomatis",
+    new Date().toISOString()
+  );
 }
 
 function tampilkan(){
