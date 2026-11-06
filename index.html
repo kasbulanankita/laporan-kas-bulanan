@@ -94,6 +94,14 @@ th,td{border:1px solid #ccc}
   font-size: 18px;
   z-index: 2;
 }
+/* Menu Manajemen Anggota hanya untuk Admin */
+#adminUsersCard {
+  display: none;
+}
+
+.container.authenticated.admin #adminUsersCard {
+  display: block;
+}
 </style>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2563eb">
@@ -156,6 +164,17 @@ th,td{border:1px solid #ccc}
   <button type="button" id="tombolLogout" class="cancel">
     Logout
   </button>
+</div>
+<div id="adminUsersCard" class="card no-print">
+  <h2>Manajemen Anggota</h2>
+
+  <button type="button" onclick="muatDaftarAnggota()">
+    Muat Daftar Anggota
+  </button>
+
+  <div id="daftarAnggota">
+    <p>Tekan tombol untuk melihat daftar akun.</p>
+  </div>
 </div>
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
@@ -1386,6 +1405,59 @@ window.addEventListener("appinstalled", () => {
   installButton.style.display = "none";
   deferredPrompt = null;
 });
+async function muatDaftarAnggota() {
+  const wadah = document.getElementById("daftarAnggota");
+
+  if (roleAktif !== "admin") {
+    alert("Hanya Admin yang boleh melihat daftar anggota.");
+    return;
+  }
+
+  wadah.textContent = "Memuat daftar anggota...";
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "admin_list_users"
+    );
+
+    if (error) throw error;
+
+    wadah.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      wadah.textContent = "Belum ada akun terdaftar.";
+      return;
+    }
+
+    data.forEach(anggota => {
+      const baris = document.createElement("div");
+      baris.style.padding = "10px";
+      baris.style.borderBottom = "1px solid #ddd";
+
+      const email = document.createElement("p");
+      email.textContent = "Email: " + anggota.email;
+
+      const peran = document.createElement("p");
+      peran.textContent =
+        "Peran: " +
+        (anggota.role === "admin" ? "Admin" : "Anggota");
+
+      const tanggal = document.createElement("p");
+      tanggal.textContent =
+        "Terdaftar: " +
+        new Date(anggota.created_at).toLocaleDateString("id-ID");
+
+      baris.appendChild(email);
+      baris.appendChild(peran);
+      baris.appendChild(tanggal);
+
+      wadah.appendChild(baris);
+    });
+
+  } catch (error) {
+    wadah.textContent = "Gagal memuat anggota: " + error.message;
+  }
+}
 </script>
 </body>
 </html>
