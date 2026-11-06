@@ -181,9 +181,17 @@ let idEdit = null;
 // Ambil nama kas yang tersimpan
 $("namaKas").value = localStorage.getItem("namaKas") || "";
 
+function updateJudulKas(){
+  const nama = $("namaKas").value.trim();
+  $("judulKas").textContent = nama || "Laporan Kas Bulanan";
+}
+
+updateJudulKas();
+
 // Simpan nama kas otomatis saat diketik
 $("namaKas").addEventListener("input", function(){
   localStorage.setItem("namaKas", this.value);
+  updateJudulKas();
 });
 const rupiah = angka => new Intl.NumberFormat("id-ID", {
 style:"currency",
