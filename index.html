@@ -60,6 +60,40 @@ th,td{border:1px solid #ccc}
 .container.authenticated > #authCard {
   display: none !important;
 }
+/* Form transaksi hanya untuk Admin */
+.container.authenticated:not(.admin) #formTransaksiCard {
+  display: none !important;
+}.container.authenticated:not(.admin) #tombolHapusSemua {
+  display: none !important;
+}
+.container.authenticated:not(.admin) #tombolPulihkanOtomatis,
+.container.authenticated:not(.admin) #tombolPilihRestore {
+  display: none !important;
+}
+.password-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 55px;
+  box-sizing: border-box;
+}
+
+.password-wrapper button {
+  position: absolute;
+  right: 5px;
+  top: 0;
+  bottom: 0;
+  width: 42px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  z-index: 2;
+}
 </style>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2563eb">
@@ -75,16 +109,18 @@ th,td{border:1px solid #ccc}
       type="email"
       id="emailLogin"
       placeholder="Alamat email"
-      required
-    >
-
-    <input
-      type="password"
-      id="passwordLogin"
-      placeholder="Kata sandi"
-      required
-    >
-
+      required>
+<div class="password-wrapper">
+  <input
+    type="password"
+    id="passwordLogin"
+    placeholder="Kata sandi"
+    required
+  >
+  <button type="button" onclick="togglePassword('passwordLogin', this)">
+    👁️
+  </button>
+</div>
     <button type="submit">Login</button>
   </form>
 
@@ -97,17 +133,19 @@ th,td{border:1px solid #ccc}
       type="email"
       id="emailDaftar"
       placeholder="Email untuk mendaftar"
-      required
-    >
-
-    <input
-      type="password"
-      id="passwordDaftar"
-      placeholder="Buat kata sandi (minimal 6 karakter)"
-      minlength="6"
-      required
-    >
-
+      required>
+<div class="password-wrapper">
+  <input
+    type="password"
+    id="passwordDaftar"
+    placeholder="Buat kata sandi (minimal 6 karakter)"
+    minlength="6"
+    required
+  >
+  <button type="button" onclick="togglePassword('passwordDaftar', this)">
+    👁️
+  </button>
+</div>
     <button type="submit">Daftar Akun</button>
   </form>
 
@@ -154,7 +192,7 @@ th,td{border:1px solid #ccc}
 </div>
 </div>
 
-<div class="card no-print">
+<div id="formTransaksiCard" class="card no-print">
 <h2 id="judulForm">Tambah Transaksi</h2>
 <form id="formKas">
 <input type="date" id="tanggal" required>
@@ -192,7 +230,7 @@ th,td{border:1px solid #ccc}
 <button class="export" onclick="eksporCSV()">Ekspor ke CSV</button>
 <button class="export" onclick="simpanLaporanGambar()">
   📸 Simpan Laporan sebagai Gambar</button>
-<button class="delete" onclick="hapusSemua()">Hapus Semua Data</button>
+<button id="tombolHapusSemua" class="delete" onclick="hapusSemua()">Hapus Semua Data</button>
 </div>
 </div>
 
@@ -209,7 +247,7 @@ Restore digunakan untuk mengembalikan data dari file cadangan.
 </p>
 
 <button class="backup" onclick="backupData()">Backup Seluruh Data</button>
-<button class="restore" onclick="pulihkanBackupOtomatis()">
+<button id="tombolPulihkanOtomatis" class="restore" onclick="pulihkanBackupOtomatis()">
 Pulihkan Backup Otomatis
 </button>
 <input
@@ -219,11 +257,9 @@ accept=".json,application/json"
 style="display:none"
 onchange="restoreData(event)"
 >
-
-<button class="restore" onclick="$('fileRestore').click()">
+<button id="tombolPilihRestore" class="restore" onclick="$('fileRestore').click()">
 Pilih File untuk Restore
 </button>
-
 <p class="info">
 Perhatian: Restore akan mengganti seluruh data transaksi yang saat ini tersimpan dengan isi file cadangan.
 </p>
@@ -326,7 +362,7 @@ async function mulaiSesi(user) {
   const { data: transaksi, error: errorTransaksi } =
     await supabaseClient
       .from("transaksi")
-      .select("id, tanggal, jenis, keterangan, jumlah")
+      .select("id, user_id, tanggal, jenis, keterangan, jumlah")
       .order("tanggal", { ascending: true });
 
   if (errorTransaksi) {
@@ -351,7 +387,10 @@ async function mulaiSesi(user) {
     (roleAktif === "admin" ? "Admin" : "Anggota");
 
   document.querySelector(".container").classList.add("authenticated");
-
+document.querySelector(".container").classList.toggle(
+  "admin",
+  roleAktif === "admin"
+);
   statusAutentikasi("");
 
   tampilkan();
@@ -515,22 +554,24 @@ td.className = x.jenis === "masuk" ? "income" : "expense";
 tr.appendChild(td);
 });
 
-const td = document.createElement("td");
-td.className = "actions no-print";
+if (roleAktif === "admin") {
+  const td = document.createElement("td");
+  td.className = "actions no-print";
 
-const edit = document.createElement("button");
-edit.textContent = "Edit";
-edit.className = "edit";
-edit.onclick = () => mulaiEdit(x.id);
+  const edit = document.createElement("button");
+  edit.textContent = "Edit";
+  edit.className = "edit";
+  edit.onclick = () => mulaiEdit(x.id);
 
-const hapus = document.createElement("button");
-hapus.textContent = "Hapus";
-hapus.className = "delete";
-hapus.onclick = () => hapusSatu(x.id);
+  const hapus = document.createElement("button");
+  hapus.textContent = "Hapus";
+  hapus.className = "delete";
+  hapus.onclick = () => hapusSatu(x.id);
 
-td.appendChild(edit);
-td.appendChild(hapus);
-tr.appendChild(td);
+  td.appendChild(edit);
+  td.appendChild(hapus);
+  tr.appendChild(td);
+}
 
 $("daftarKas").appendChild(tr);
 });
@@ -682,10 +723,13 @@ async function hapusSatu(id) {
 }
 
 async function hapusSemua() {
+  if (roleAktif !== "admin") {
+    alert("Maaf, hanya Admin yang dapat menghapus transaksi.");
+    return;
+  }
+
   if (!confirm(
-    roleAktif === "admin"
-      ? "Yakin ingin menghapus SELURUH transaksi semua anggota?"
-      : "Yakin ingin menghapus seluruh transaksi milik Anda?"
+    "Yakin ingin menghapus SELURUH transaksi semua anggota?"
   )) return;
 
   try {
@@ -810,7 +854,41 @@ a.click();
 URL.revokeObjectURL(url);
 alert("File backup berhasil dibuat. Simpan file tersebut di tempat yang aman.");
 }
-function pulihkanBackupOtomatis(){
+async function pulihkanTransaksiKeSupabase(transaksi) {
+  if (roleAktif !== "admin") {
+    throw new Error("Hanya Admin yang boleh melakukan Restore.");
+  }
+
+  const { error: errorRestore } = await supabaseClient.rpc(
+    "admin_restore_transaksi",
+    {
+      p_transaksi: transaksi
+    }
+  );
+
+  if (errorRestore) throw errorRestore;
+
+  const { data, error } = await supabaseClient
+    .from("transaksi")
+    .select("id, user_id, tanggal, jenis, keterangan, jumlah")
+    .order("tanggal", { ascending: true });
+
+  if (error) throw error;
+
+  dataKas = data.map(item => ({
+    ...item,
+    jumlah: Number(item.jumlah)
+  }));
+
+  simpan();
+  batalEdit();
+  tampilkan();
+  tampilkanStatusBackup();
+}
+async function pulihkanBackupOtomatis(){  if (roleAktif !== "admin") {
+    alert("Maaf, hanya Admin yang boleh memulihkan backup.");
+    return;
+  }
   const backup = localStorage.getItem("backupOtomatisKas");
 
   if(!backup){
@@ -830,20 +908,9 @@ function pulihkanBackupOtomatis(){
     if(!Array.isArray(transaksi)){
       throw new Error("Format backup tidak valid.");
     }
+await pulihkanTransaksiKeSupabase(transaksi);
 
-    dataKas = transaksi;
-
-    localStorage.setItem(
-      "dataKasBulanan",
-      JSON.stringify(dataKas)
-    );
-
-    batalEdit();
-    tampilkan();
-    tampilkanStatusBackup();
-
-    alert("Backup otomatis berhasil dipulihkan!");
-
+alert("Backup otomatis berhasil dipulihkan ke database online!");
   }catch(err){
     alert("Pemulihan gagal: " + err.message);
   }
@@ -1163,13 +1230,17 @@ function simpanLaporanGambar(){
           }
         
   
-function restoreData(event){
+function restoreData(event){if (roleAktif !== "admin") {
+  alert("Maaf, hanya Admin yang boleh melakukan Restore.");
+  event.target.value = "";
+  return;
+}
 const file = event.target.files[0];
 if(!file) return;
 
 const reader = new FileReader();
 
-reader.onload = function(e){
+reader.onload = async function(e){
 try{
 const cadangan = JSON.parse(e.target.result);
 
@@ -1203,14 +1274,9 @@ if(!confirm(
 )){
 return;
 }
+await pulihkanTransaksiKeSupabase(cadangan.transaksi);
 
-dataKas = cadangan.transaksi;
-simpan();
-batalEdit();
-tampilkan();
-
-alert("Restore berhasil! Data transaksi sudah dipulihkan.");
-
+alert("Restore berhasil! Data transaksi sudah dipulihkan ke database online.");
 }catch(err){
 alert("Restore gagal: " + err.message);
 }finally{
@@ -1254,6 +1320,17 @@ async function periksaSesiLogin() {
 
 // Jalankan pemeriksaan sesi
 periksaSesiLogin();
+function togglePassword(id, tombol) {
+  const input = document.getElementById(id);
+
+  if (input.type === "password") {
+    input.type = "text";
+    tombol.textContent = "🙈";
+  } else {
+    input.type = "password";
+    tombol.textContent = "👁️";
+  }
+}
 </script>
 
 <script>
