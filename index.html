@@ -51,28 +51,74 @@ header{background:white!important;color:black;border:1px solid #999}
 table{font-size:11px}
 th,td{border:1px solid #ccc}
 }
+/* Sembunyikan aplikasi sebelum login */
+.container:not(.authenticated) > :not(#authCard) {
+  display: none !important;
+}
+
+/* Sembunyikan form login setelah berhasil login */
+.container.authenticated > #authCard {
+  display: none !important;
+}
 </style>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2563eb">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script>
-const SUPABASE_URL = "https://bsjefzkxovyilkdxpwnh.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BLZE0ccJ6x_saeOuldDfSQ_CPlVxoML";
-
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
-); 
-console.log("Supabase berhasil dimuat:", !!supabaseClient);
-  
-</script>
-</head>
+<meta name="apple-mobile-web-app-capable" content="yes"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
 <div class="container">
+<div id="authCard" class="card no-print">
+  <h2>Login Aplikasi Kas</h2>
 
+  <form id="formLogin">
+    <input
+      type="email"
+      id="emailLogin"
+      placeholder="Alamat email"
+      required
+    >
+
+    <input
+      type="password"
+      id="passwordLogin"
+      placeholder="Kata sandi"
+      required
+    >
+
+    <button type="submit">Login</button>
+  </form>
+
+  <hr>
+
+  <h3>Belum punya akun?</h3>
+
+  <form id="formDaftar">
+    <input
+      type="email"
+      id="emailDaftar"
+      placeholder="Email untuk mendaftar"
+      required
+    >
+
+    <input
+      type="password"
+      id="passwordDaftar"
+      placeholder="Buat kata sandi (minimal 6 karakter)"
+      minlength="6"
+      required
+    >
+
+    <button type="submit">Daftar Akun</button>
+  </form>
+
+  <p id="statusAuth"></p>
+</div>
+<div id="userBar" class="card no-print">
+  <span id="infoPengguna"></span>
+  <button type="button" id="tombolLogout" class="cancel">
+    Logout
+  </button>
+</div>
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
 <p>Catatan pemasukan dan pengeluaran kas</p>
@@ -187,6 +233,153 @@ Perhatian: Restore akan mengganti seluruh data transaksi yang saat ini tersimpan
 
 <script>
 const $ = id => document.getElementById(id);
+// Koneksi Supabase
+const SUPABASE_URL = "https://bsjefzkxovyilkdxpwnh.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BLZE0ccJ6x_saeOuldDfSQ_CPlVxoML";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
+// Status pengguna yang sedang login
+let penggunaAktif = null;
+let roleAktif = null;
+
+// Fungsi menampilkan status autentikasi
+function statusAutentikasi(pesan) {
+  const status = $("statusAuth");
+  if (status) status.textContent = pesan;
+}
+
+// Proses login
+$("formLogin").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const email = $("emailLogin").value.trim();
+  const password = $("passwordLogin").value;
+
+  statusAutentikasi("Sedang login...");
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    statusAutentikasi("Login gagal: " + error.message);
+    return;
+  }
+
+  await mulaiSesi(data.user);
+});
+
+// Proses pendaftaran akun
+$("formDaftar").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const email = $("emailDaftar").value.trim();
+  const password = $("passwordDaftar").value;
+
+  statusAutentikasi("Sedang mendaftarkan akun...");
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    statusAutentikasi("Pendaftaran gagal: " + error.message);
+    return;
+  }
+
+  if (!data.session) {
+    statusAutentikasi(
+      "Pendaftaran berhasil. Silakan periksa email untuk konfirmasi, lalu login."
+    );
+    return;
+  }
+
+  await mulaiSesi(data.user);
+});
+
+// Memeriksa profil dan membuka aplikasi
+
+async function mulaiSesi(user) {
+  statusAutentikasi("Memuat data transaksi...");
+
+  // Ambil profil dan peran pengguna
+  const { data: profil, error: errorProfil } =
+    await supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+  if (errorProfil) {
+    statusAutentikasi("Gagal membaca profil: " + errorProfil.message);
+    return;
+  }
+
+  // Ambil transaksi dari database
+  // RLS Supabase otomatis membatasi data anggota.
+  // Admin dapat melihat seluruh transaksi.
+  const { data: transaksi, error: errorTransaksi } =
+    await supabaseClient
+      .from("transaksi")
+      .select("id, tanggal, jenis, keterangan, jumlah")
+      .order("tanggal", { ascending: true });
+
+  if (errorTransaksi) {
+    statusAutentikasi(
+      "Gagal memuat transaksi: " + errorTransaksi.message
+    );
+    return;
+  }
+
+  // Ganti data tampilan dengan data dari database
+  dataKas = transaksi.map(item => ({
+    ...item,
+    jumlah: Number(item.jumlah)
+  }));
+
+  penggunaAktif = user;
+  roleAktif = profil.role;
+
+  $("infoPengguna").textContent =
+    "Akun: " + user.email +
+    " | Peran: " +
+    (roleAktif === "admin" ? "Admin" : "Anggota");
+
+  document.querySelector(".container").classList.add("authenticated");
+
+  statusAutentikasi("");
+
+  tampilkan();
+}
+
+// Tombol logout
+$("tombolLogout").addEventListener("click", async function() {
+  if (!confirm("Apakah Anda yakin ingin logout?")) return;
+
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert("Logout gagal: " + error.message);
+    return;
+  }
+
+  penggunaAktif = null;
+  roleAktif = null;
+
+  document.querySelector(".container").classList.remove("authenticated");
+
+  $("infoPengguna").textContent = "";
+  $("formLogin").reset();
+  $("formDaftar").reset();
+
+  statusAutentikasi("Anda telah logout.");
+});
 
 // Membaca data dengan aman agar kesalahan format penyimpanan
 // tidak menghentikan seluruh JavaScript aplikasi.
@@ -344,34 +537,92 @@ $("daftarKas").appendChild(tr);
 });
 }
 
-$("formKas").addEventListener("submit", e => {
-e.preventDefault();
 
-const transaksi = {
-tanggal: $("tanggal").value,
-jenis: $("jenis").value,
-keterangan: $("keterangan").value.trim(),
-jumlah: Number($("jumlah").value)
-};
+$("formKas").addEventListener("submit", async e => {
+  e.preventDefault();
 
-if(!transaksi.tanggal || !transaksi.keterangan || transaksi.jumlah <= 0){
-alert("Mohon isi semua data dengan benar.");
-return;
-}
+  const transaksi = {
+    tanggal: $("tanggal").value,
+    jenis: $("jenis").value,
+    keterangan: $("keterangan").value.trim(),
+    jumlah: Number($("jumlah").value)
+  };
 
-if(idEdit !== null){
-const index = dataKas.findIndex(x => x.id === idEdit);
-if(index !== -1){
-dataKas[index] = {...dataKas[index], ...transaksi};
-}
-}else{
-dataKas.push({id:Date.now(), ...transaksi});
-}
+  if (
+    !transaksi.tanggal ||
+    !transaksi.keterangan ||
+    transaksi.jumlah <= 0
+  ) {
+    alert("Mohon isi semua data dengan benar.");
+    return;
+  }
 
-simpan();
-batalEdit();
-tampilkan();
+  $("tombolSimpan").disabled = true;
+  $("tombolSimpan").textContent = "Menyimpan...";
+
+  try {
+    if (idEdit !== null) {
+      // Memperbarui transaksi di Supabase
+      const { data, error } = await supabaseClient
+        .from("transaksi")
+        .update(transaksi)
+        .eq("id", idEdit)
+        .select("id, tanggal, jenis, keterangan, jumlah")
+        .single();
+
+      if (error) throw error;
+
+      const index = dataKas.findIndex(x => x.id === idEdit);
+
+      const hasil = {
+        ...data,
+        jumlah: Number(data.jumlah)
+      };
+
+      if (index !== -1) {
+        dataKas[index] = hasil;
+      } else {
+        dataKas.push(hasil);
+      }
+
+    } else {
+      // Menambahkan transaksi baru ke Supabase
+      const { data, error } = await supabaseClient
+        .from("transaksi")
+        .insert(transaksi)
+        .select("id, tanggal, jenis, keterangan, jumlah")
+        .single();
+
+      if (error) throw error;
+
+      dataKas.push({
+        ...data,
+        jumlah: Number(data.jumlah)
+      });
+    }
+
+    // Backup lokal setelah penyimpanan online berhasil
+    simpan();
+
+    batalEdit();
+    tampilkan();
+
+    alert("Transaksi berhasil disimpan.");
+
+  } catch (error) {
+    alert("Gagal menyimpan transaksi: " + error.message);
+
+  } finally {
+    $("tombolSimpan").disabled = false;
+
+    if (idEdit !== null) {
+      $("tombolSimpan").textContent = "Simpan Perubahan";
+    } else {
+      $("tombolSimpan").textContent = "Simpan Transaksi";
+    }
+  }
 });
+
 
 function mulaiEdit(id){
 const x = dataKas.find(item => item.id === id);
@@ -405,20 +656,58 @@ return new Date(d.getTime() - offset * 60000)
 .toISOString().slice(0,10);
 }
 
-function hapusSatu(id){
-if(!confirm("Hapus transaksi ini?")) return;
-dataKas = dataKas.filter(x => x.id !== id);
-simpan();
-if(idEdit === id) batalEdit();
-tampilkan();
+async function hapusSatu(id) {
+  if (!confirm("Hapus transaksi ini?")) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from("transaksi")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+
+    dataKas = dataKas.filter(x => x.id !== id);
+
+    simpan();
+
+    if (idEdit === id) batalEdit();
+
+    tampilkan();
+
+    alert("Transaksi berhasil dihapus.");
+
+  } catch (error) {
+    alert("Gagal menghapus transaksi: " + error.message);
+  }
 }
 
-function hapusSemua(){
-if(!confirm("Yakin ingin menghapus seluruh data kas?")) return;
-dataKas = [];
-simpan();
-batalEdit();
-tampilkan();
+async function hapusSemua() {
+  if (!confirm(
+    roleAktif === "admin"
+      ? "Yakin ingin menghapus SELURUH transaksi semua anggota?"
+      : "Yakin ingin menghapus seluruh transaksi milik Anda?"
+  )) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from("transaksi")
+      .delete()
+      .not("id", "is", null);
+
+    if (error) throw error;
+
+    dataKas = [];
+
+    simpan();
+    batalEdit();
+    tampilkan();
+
+    alert("Transaksi berhasil dihapus.");
+
+  } catch (error) {
+    alert("Gagal menghapus transaksi: " + error.message);
+  }
 }
 
 function cetakPDF(){
@@ -814,7 +1103,7 @@ function simpanLaporanGambar(){
 
     ctx.textAlign = "right";
     ctx.fillText(
-    rupiah(total),
+      rupiah(total),
       W-P-20,y+44
     );
     ctx.textAlign = "left";
@@ -942,8 +1231,6 @@ $("bulan").value = tanggalHariIni().slice(0,7);
 $("tanggal").value = tanggalHariIni();
 $("bulan").addEventListener("change", tampilkan);
 
-tampilkan();
-
 if (masalahBacaData) {
   alert(
     "PERHATIAN: Data transaksi lama tidak dapat dibaca. " +
@@ -951,6 +1238,23 @@ if (masalahBacaData) {
     "Jangan hapus data browser. Hubungi ChatGPT sebelum melakukan restore."
   );
 }
+
+// Memeriksa sesi login saat aplikasi dibuka
+async function periksaSesiLogin() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    statusAutentikasi("Gagal memeriksa sesi: " + error.message);
+    return;
+  }
+
+  if (data.session) {
+    await mulaiSesi(data.session.user);
+  }
+}
+
+// Jalankan pemeriksaan sesi
+periksaSesiLogin();
 </script>
 
 <script>
