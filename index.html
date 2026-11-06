@@ -186,7 +186,21 @@ function simpan(){
     new Date().toISOString()
   );
 }
+function tampilkanStatusBackup(){
+  const waktu = localStorage.getItem("waktuBackupOtomatis");
+  const status = $("statusBackup");
 
+  if (!waktu) {
+    status.textContent = "Backup otomatis belum dilakukan.";
+    return;
+  }
+
+  const tanggal = new Date(waktu);
+
+  status.textContent =
+    "Backup otomatis terakhir: " +
+    tanggal.toLocaleString("id-ID");
+}
 function tampilkan(){
 const bulan = $("bulan").value;
 
