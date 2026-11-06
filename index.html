@@ -415,7 +415,44 @@ a.click();
 URL.revokeObjectURL(url);
 alert("File backup berhasil dibuat. Simpan file tersebut di tempat yang aman.");
 }
+function pulihkanBackupOtomatis(){
+  const backup = localStorage.getItem("backupOtomatisKas");
 
+  if(!backup){
+    alert("Backup otomatis belum tersedia.");
+    return;
+  }
+
+  if(!confirm(
+    "Pulihkan backup otomatis? Semua data saat ini akan diganti dengan data backup."
+  )){
+    return;
+  }
+
+  try{
+    const transaksi = JSON.parse(backup);
+
+    if(!Array.isArray(transaksi)){
+      throw new Error("Format backup tidak valid.");
+    }
+
+    dataKas = transaksi;
+
+    localStorage.setItem(
+      "dataKasBulanan",
+      JSON.stringify(dataKas)
+    );
+
+    batalEdit();
+    tampilkan();
+    tampilkanStatusBackup();
+
+    alert("Backup otomatis berhasil dipulihkan!");
+
+  }catch(err){
+    alert("Pemulihan gagal: " + err.message);
+  }
+  }
 function restoreData(event){
 const file = event.target.files[0];
 if(!file) return;
