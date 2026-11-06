@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -19,6 +18,8 @@ button.delete{background:#dc2626}
 button.export{background:#2563eb}
 button.edit{background:#d97706}
 button.cancel{background:#64748b}
+button.backup{background:#0f766e}
+button.restore{background:#7c3aed}
 .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .summary div{padding:12px 8px;border-radius:10px;background:#ecfdf5;text-align:center;overflow-wrap:anywhere}
 .summary div:nth-child(2){background:#fef2f2}
@@ -33,6 +34,7 @@ th{background:#f8fafc}
 .expense{color:#dc2626;font-weight:bold}
 .empty{text-align:center;color:#64748b;padding:20px}
 .actions button{width:auto;padding:7px;margin:2px;font-size:12px}
+.info{font-size:13px;color:#64748b;line-height:1.5}
 @media(max-width:420px){
 .summary{grid-template-columns:1fr}
 .summary div{display:flex;justify-content:space-between;align-items:center}
@@ -44,7 +46,7 @@ body{background:white;padding:0;color:black}
 .container{max-width:none}
 header{background:white!important;color:black;border:1px solid #999}
 .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
-.no-print,.actions{display:none!important}
+.no-print{display:none!important}
 .summary div{border:1px solid #ccc;background:white!important}
 table{font-size:11px}
 th,td{border:1px solid #ccc}
@@ -77,15 +79,12 @@ th,td{border:1px solid #ccc}
 <h2 id="judulForm">Tambah Transaksi</h2>
 <form id="formKas">
 <input type="date" id="tanggal" required>
-
 <select id="jenis" required>
 <option value="masuk">Pemasukan</option>
 <option value="keluar">Pengeluaran</option>
 </select>
-
 <input type="text" id="keterangan" placeholder="Keterangan transaksi" required>
 <input type="number" id="jumlah" placeholder="Jumlah uang (Rp)" min="1" required>
-
 <button type="submit" id="tombolSimpan">Simpan Transaksi</button>
 <button type="button" class="cancel" id="tombolBatal" style="display:none" onclick="batalEdit()">Batal Edit</button>
 </form>
@@ -107,7 +106,6 @@ th,td{border:1px solid #ccc}
 <tbody id="daftarKas"></tbody>
 </table>
 </div>
-
 <p id="kosong" class="empty">Belum ada transaksi bulan ini.</p>
 
 <div class="no-print">
@@ -115,6 +113,32 @@ th,td{border:1px solid #ccc}
 <button class="export" onclick="eksporCSV()">Ekspor ke CSV</button>
 <button class="delete" onclick="hapusSemua()">Hapus Semua Data</button>
 </div>
+</div>
+
+<div class="card no-print">
+<h2>Backup dan Restore Data</h2>
+<p class="info">
+Backup digunakan untuk menyimpan seluruh transaksi ke file cadangan.
+Restore digunakan untuk mengembalikan data dari file cadangan.
+</p>
+
+<button class="backup" onclick="backupData()">Backup Seluruh Data</button>
+
+<input
+type="file"
+id="fileRestore"
+accept=".json,application/json"
+style="display:none"
+onchange="restoreData(event)"
+>
+
+<button class="restore" onclick="$('fileRestore').click()">
+Pilih File untuk Restore
+</button>
+
+<p class="info">
+Perhatian: Restore akan mengganti seluruh data transaksi yang saat ini tersimpan dengan isi file cadangan.
+</p>
 </div>
 
 </div>
@@ -157,7 +181,6 @@ $("totalMasuk").textContent = rupiah(masuk);
 $("totalKeluar").textContent = rupiah(keluar);
 $("saldo").textContent = rupiah(masuk-keluar);
 $("daftarKas").innerHTML = "";
-
 $("kosong").style.display = data.length ? "none" : "block";
 
 data.forEach(x => {
@@ -219,18 +242,11 @@ return;
 
 if(idEdit !== null){
 const index = dataKas.findIndex(x => x.id === idEdit);
-
 if(index !== -1){
-dataKas[index] = {
-...dataKas[index],
-...transaksi
-};
+dataKas[index] = {...dataKas[index], ...transaksi};
 }
 }else{
-dataKas.push({
-id: Date.now(),
-...transaksi
-});
+dataKas.push({id:Date.now(), ...transaksi});
 }
 
 simpan();
@@ -243,7 +259,6 @@ const x = dataKas.find(item => item.id === id);
 if(!x) return;
 
 idEdit = id;
-
 $("tanggal").value = x.tanggal;
 $("jenis").value = x.jenis;
 $("keterangan").value = x.keterangan;
@@ -252,18 +267,15 @@ $("jumlah").value = x.jumlah;
 $("judulForm").textContent = "Edit Transaksi";
 $("tombolSimpan").textContent = "Simpan Perubahan";
 $("tombolBatal").style.display = "block";
-
 $("formKas").scrollIntoView({behavior:"smooth"});
 }
 
 function batalEdit(){
 idEdit = null;
 $("formKas").reset();
-
 $("judulForm").textContent = "Tambah Transaksi";
 $("tombolSimpan").textContent = "Simpan Transaksi";
 $("tombolBatal").style.display = "none";
-
 $("tanggal").value = tanggalHariIni();
 }
 
@@ -276,18 +288,14 @@ return new Date(d.getTime() - offset * 60000)
 
 function hapusSatu(id){
 if(!confirm("Hapus transaksi ini?")) return;
-
 dataKas = dataKas.filter(x => x.id !== id);
 simpan();
-
 if(idEdit === id) batalEdit();
-
 tampilkan();
 }
 
 function hapusSemua(){
 if(!confirm("Yakin ingin menghapus seluruh data kas?")) return;
-
 dataKas = [];
 simpan();
 batalEdit();
@@ -296,7 +304,6 @@ tampilkan();
 
 function cetakPDF(){
 const bulan = $("bulan").value;
-
 if(!bulan){
 alert("Pilih bulan terlebih dahulu.");
 return;
@@ -316,7 +323,6 @@ window.print();
 
 function eksporCSV(){
 const bulan = $("bulan").value;
-
 const data = dataKas.filter(x => x.tanggal.startsWith(bulan));
 
 if(!data.length){
@@ -326,12 +332,7 @@ return;
 
 const rows = [
 ["Tanggal","Keterangan","Jenis","Jumlah"],
-...data.map(x => [
-x.tanggal,
-x.keterangan,
-x.jenis,
-x.jumlah
-])
+...data.map(x => [x.tanggal,x.keterangan,x.jenis,x.jumlah])
 ];
 
 const csv = rows.map(r =>
@@ -344,17 +345,100 @@ type:"text/csv;charset=utf-8;"
 
 const url = URL.createObjectURL(blob);
 const a = document.createElement("a");
-
 a.href = url;
 a.download = "laporan-kas-" + bulan + ".csv";
 a.click();
+URL.revokeObjectURL(url);
+}
+
+function backupData(){
+const cadangan = {
+aplikasi:"Laporan Kas Bulanan",
+versi:1,
+tanggalBackup:new Date().toISOString(),
+transaksi:dataKas
+};
+
+const blob = new Blob(
+[JSON.stringify(cadangan,null,2)],
+{type:"application/json"}
+);
+
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = "backup-kas-" + tanggalHariIni() + ".json";
+a.click();
 
 URL.revokeObjectURL(url);
+alert("File backup berhasil dibuat. Simpan file tersebut di tempat yang aman.");
+}
+
+function restoreData(event){
+const file = event.target.files[0];
+if(!file) return;
+
+const reader = new FileReader();
+
+reader.onload = function(e){
+try{
+const cadangan = JSON.parse(e.target.result);
+
+if(
+!cadangan ||
+cadangan.aplikasi !== "Laporan Kas Bulanan" ||
+!Array.isArray(cadangan.transaksi)
+){
+throw new Error("Format file tidak sesuai.");
+}
+
+const valid = cadangan.transaksi.every(x =>
+x &&
+(x.id !== undefined && x.id !== null) &&
+typeof x.tanggal === "string" &&
+/^\d{4}-\d{2}-\d{2}$/.test(x.tanggal) &&
+["masuk","keluar"].includes(x.jenis) &&
+typeof x.keterangan === "string" &&
+x.keterangan.trim().length > 0 &&
+Number.isFinite(x.jumlah) &&
+x.jumlah > 0
+);
+
+if(!valid){
+throw new Error("Ada data transaksi yang tidak valid.");
+}
+
+if(!confirm(
+"File berisi " + cadangan.transaksi.length +
+" transaksi. Restore akan mengganti semua data saat ini. Lanjutkan?"
+)){
+return;
+}
+
+dataKas = cadangan.transaksi;
+simpan();
+batalEdit();
+tampilkan();
+
+alert("Restore berhasil! Data transaksi sudah dipulihkan.");
+
+}catch(err){
+alert("Restore gagal: " + err.message);
+}finally{
+$("fileRestore").value = "";
+}
+};
+
+reader.onerror = function(){
+alert("File tidak dapat dibaca.");
+$("fileRestore").value = "";
+};
+
+reader.readAsText(file);
 }
 
 $("bulan").value = new Date().toISOString().slice(0,7);
 $("tanggal").value = tanggalHariIni();
-
 $("bulan").addEventListener("change", tampilkan);
 
 tampilkan();
