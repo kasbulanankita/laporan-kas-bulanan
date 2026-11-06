@@ -62,6 +62,7 @@ th,td{border:1px solid #ccc}
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
 <p>Catatan pemasukan dan pengeluaran kas</p>
+<p style="font-size:11px;opacity:.8;margin:6px 0 0">Pemeriksaan aplikasi v3</p>
 
 <div class="no-print" style="margin-top:15px">
     <label for="namaKas">Nama Kas / Kelompok</label>
@@ -173,9 +174,31 @@ Perhatian: Restore akan mengganti seluruh data transaksi yang saat ini tersimpan
 <script>
 const $ = id => document.getElementById(id);
 
-let dataKas = JSON.parse(
-localStorage.getItem("dataKasBulanan") || "[]"
-);
+// Membaca data dengan aman agar kesalahan format penyimpanan
+// tidak menghentikan seluruh JavaScript aplikasi.
+let dataKas = [];
+let masalahBacaData = "";
+try {
+  const dataTersimpan = localStorage.getItem("dataKasBulanan");
+  if (dataTersimpan) {
+    const hasilBaca = JSON.parse(dataTersimpan);
+    if (!Array.isArray(hasilBaca)) {
+      throw new Error("Data tersimpan bukan daftar transaksi.");
+    }
+    dataKas = hasilBaca;
+  }
+} catch (error) {
+  masalahBacaData = error.message || "Format data tidak dikenali.";
+  try {
+    const dataAsli = localStorage.getItem("dataKasBulanan");
+    if (dataAsli !== null && localStorage.getItem("dataKasBulanan_raw_backup") === null) {
+      localStorage.setItem("dataKasBulanan_raw_backup", dataAsli);
+    }
+  } catch (backupError) {
+    console.error("Salinan data mentah gagal dibuat:", backupError);
+  }
+  console.error("Data transaksi tidak dapat dibaca:", error);
+}
 
 let idEdit = null;
 // Pengaturan nama kas
@@ -777,7 +800,7 @@ function simpanLaporanGambar(){
 
     ctx.textAlign = "right";
     ctx.fillText(
-      rupiah(total),
+    rupiah(total),
       W-P-20,y+44
     );
     ctx.textAlign = "left";
@@ -906,6 +929,14 @@ $("tanggal").value = tanggalHariIni();
 $("bulan").addEventListener("change", tampilkan);
 
 tampilkan();
+
+if (masalahBacaData) {
+  alert(
+    "PERHATIAN: Data transaksi lama tidak dapat dibaca. " +
+    "Salinan data aslinya dipertahankan di penyimpanan browser. " +
+    "Jangan hapus data browser. Hubungi ChatGPT sebelum melakukan restore."
+  );
+}
 </script>
 
 <script>
