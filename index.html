@@ -1471,10 +1471,10 @@ username.textContent = "Username: " + anggota.username;
       tombol.textContent = "Simpan Perubahan";
 
       const akunSendiri =
-        penggunaAktif && anggota.id === penggunaAktif.id;
+  penggunaAktif && anggota.id === penggunaAktif.id;
 
-      if (akunSendiri) {
-        pilihan.disabled = true;
+if (akunSendiri) {
+  pilihan.disabled = true;
         tombol.disabled = true;
         tombol.textContent = "Akun Anda";
       } else {
@@ -1495,6 +1495,32 @@ username.textContent = "Username: " + anggota.username;
     wadah.textContent =
       "Gagal memuat anggota: " + error.message;
   }
+}
+async function ubahPeranAnggota(id, peran) {
+  if (roleAktif !== "admin") {
+    alert("Hanya Admin yang boleh mengubah peran.");
+    return;
+  }
+
+  if (!confirm("Yakin ingin mengubah peran akun ini?")) {
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc(
+    "admin_set_profile_role",
+    {
+      p_target_user_id: id,
+      p_new_role: peran
+    }
+  );
+
+  if (error) {
+    alert("Gagal mengubah peran: " + error.message);
+    return;
+  }
+
+  alert("Peran anggota berhasil diperbarui.");
+  await muatDaftarAnggota();
 }
 </script>
 </body>
