@@ -185,6 +185,7 @@ function simpan(){
     "waktuBackupOtomatis",
     new Date().toISOString()
   );
+  tampilkanStatusBackup();
 }
 function tampilkanStatusBackup(){
   const waktu = localStorage.getItem("waktuBackupOtomatis");
