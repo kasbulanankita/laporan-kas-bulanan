@@ -460,6 +460,166 @@ function pulihkanBackupOtomatis(){
     alert("Pemulihan gagal: " + err.message);
   }
   }
+  
+function simpanLaporanGambar(){
+  const bulan = $("bulan").value;
+
+  if(!bulan){
+    alert("Pilih bulan laporan terlebih dahulu.");
+    return;
+  }
+
+  const transaksi = dataKas
+    .filter(x => x.tanggal.slice(0,7) === bulan)
+    .sort((a,b) => a.tanggal.localeCompare(b.tanggal));
+
+  const masuk = transaksi
+    .filter(x => x.jenis === "masuk")
+    .reduce((total,x) => total + Number(x.jumlah), 0);
+
+  const keluar = transaksi
+    .filter(x => x.jenis === "keluar")
+    .reduce((total,x) => total + Number(x.jumlah), 0);
+
+  const saldo = masuk - keluar;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const lebar = 1200;
+  const padding = 65;
+  const tinggiBaris = 76;
+  const tinggiAwal = 620;
+
+  canvas.width = lebar;
+  canvas.height = tinggiAwal +
+    (transaksi.length * tinggiBaris) + 100;
+
+  // Latar gambar
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Judul
+  ctx.fillStyle = "#1e40af";
+  ctx.font = "bold 48px Arial";
+  ctx.fillText("LAPORAN KAS BULANAN",padding,90);
+
+  ctx.fillStyle = "#555555";
+  ctx.font = "28px Arial";
+  ctx.fillText("Periode: " + bulan, padding,140);
+
+  ctx.font = "22px Arial";
+  ctx.fillText(
+    "Dicetak: " + new Date().toLocaleString("id-ID"),
+    padding,185
+  );
+
+  // Ringkasan
+  function rupiah(angka){
+    return "Rp " + angka.toLocaleString("id-ID");
+  }
+
+  const ringkasan = [
+    ["TOTAL PEMASUKAN",masuk,"#15803d"],
+    ["TOTAL PENGELUARAN",keluar,"#dc2626"],
+    ["SALDO AKHIR",saldo,"#1d4ed8"]
+  ];
+
+  ringkasan.forEach((item,i) => {
+    const x = padding + i * 365;
+
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(x,220,335,145);
+
+    ctx.fillStyle = "#444444";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(item[0],x+20,260);
+
+    ctx.fillStyle = item[2];
+    ctx.font = "bold 30px Arial";
+    ctx.fillText(rupiah(item[1]),x+20,320);
+  });
+
+  // Judul tabel
+  let y = 420;
+
+  ctx.fillStyle = "#1e40af";
+  ctx.fillRect(padding,y,1070,65);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 22px Arial";
+
+  ctx.fillText("TANGGAL",padding+15,y+40);
+  ctx.fillText("JENIS",padding+210,y+40);
+  ctx.fillText("KETERANGAN",padding+390,y+40);
+  ctx.textAlign = "right";
+  ctx.fillText("JUMLAH",padding+1040,y+40);
+  ctx.textAlign = "left";
+
+  y += 65;
+
+  if(transaksi.length === 0){
+    ctx.fillStyle = "#555555";
+    ctx.font = "26px Arial";
+    ctx.fillText("Belum ada transaksi pada bulan ini.",padding+15,y+55);
+  }
+
+  transaksi.forEach((item,index) => {
+    ctx.fillStyle = index % 2 === 0 ? "#f8fafc" : "#ffffff";
+    ctx.fillRect(padding,y,1070,tinggiBaris);
+
+    ctx.fillStyle = "#222222";
+    ctx.font = "21px Arial";
+
+    ctx.fillText(item.tanggal,padding+15,y+45);
+
+    ctx.fillStyle = item.jenis === "masuk"
+      ? "#15803d" : "#dc2626";
+
+    ctx.fillText(
+      item.jenis === "masuk" ? "Masuk" : "Keluar",
+      padding+210,y+45
+    );
+
+    ctx.fillStyle = "#222222";
+    ctx.fillText(
+      item.keterangan.substring(0,28),
+      padding+390,y+45
+    );
+
+    ctx.textAlign = "right";
+    ctx.fillText(
+      rupiah(Number(item.jumlah)),
+      padding+1040,y+45
+    );
+    ctx.textAlign = "left";
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.strokeRect(padding,y,1070,tinggiBaris);
+
+    y += tinggiBaris;
+  });
+
+  // Unduh gambar
+  canvas.toBlob(function(blob){
+    if(!blob){
+      alert("Gambar gagal dibuat.");
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "Laporan-Kas-" + bulan + ".png";
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+    alert("Gambar laporan berhasil dibuat!");
+  },"image/png");
+}
+  
 function restoreData(event){
 const file = event.target.files[0];
 if(!file) return;
