@@ -137,7 +137,16 @@ th,td{border:1px solid #ccc}
   <h3>Belum punya akun?</h3>
 
   <form id="formDaftar">
-    <input
+  <input
+  type="text"
+  id="usernameDaftar"
+  placeholder="Buat username"
+  minlength="3"
+  maxlength="30"
+  pattern="[A-Za-z0-9_.-]+"
+  required
+>
+   <input
       type="email"
       id="emailDaftar"
       placeholder="Email untuk mendaftar"
@@ -316,10 +325,15 @@ $("formLogin").addEventListener("submit", async function(e) {
 
   statusAutentikasi("Sedang login...");
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  const { data, error } = await supabaseClient.auth.signUp({
+  email,
+  password,
+  options: {
+    data: {
+      username: username
+    }
+  }
+});
 
   if (error) {
     statusAutentikasi("Login gagal: " + error.message);
@@ -333,8 +347,9 @@ $("formLogin").addEventListener("submit", async function(e) {
 $("formDaftar").addEventListener("submit", async function(e) {
   e.preventDefault();
 
-  const email = $("emailDaftar").value.trim();
-  const password = $("passwordDaftar").value;
+  const username = $("usernameDaftar").value.trim();
+const email = $("emailDaftar").value.trim();
+const password = $("passwordDaftar").value;
 
   statusAutentikasi("Sedang mendaftarkan akun...");
 
@@ -357,7 +372,7 @@ $("formDaftar").addEventListener("submit", async function(e) {
 
   await mulaiSesi(data.user);
 });
-
+ 
 // Memeriksa profil dan membuka aplikasi
 async function mulaiSesi(user) {
   statusAutentikasi("Memuat data transaksi...");
@@ -1431,31 +1446,54 @@ async function muatDaftarAnggota() {
 
     data.forEach(anggota => {
       const baris = document.createElement("div");
-      baris.style.padding = "10px";
+      baris.style.padding = "12px";
       baris.style.borderBottom = "1px solid #ddd";
 
-      const email = document.createElement("p");
-      email.textContent = "Email: " + anggota.email;
+      const username = document.createElement("p");
+username.textContent = "Username: " + anggota.username;
 
       const peran = document.createElement("p");
       peran.textContent =
-        "Peran: " +
+        "Peran saat ini: " +
         (anggota.role === "admin" ? "Admin" : "Anggota");
 
-      const tanggal = document.createElement("p");
-      tanggal.textContent =
-        "Terdaftar: " +
-        new Date(anggota.created_at).toLocaleDateString("id-ID");
+      const pilihan = document.createElement("select");
 
-      baris.appendChild(email);
+      pilihan.innerHTML = `
+        <option value="user">Anggota</option>
+        <option value="admin">Admin</option>
+      `;
+
+      pilihan.value = anggota.role;
+
+      const tombol = document.createElement("button");
+      tombol.type = "button";
+      tombol.textContent = "Simpan Perubahan";
+
+      const akunSendiri =
+        penggunaAktif && anggota.id === penggunaAktif.id;
+
+      if (akunSendiri) {
+        pilihan.disabled = true;
+        tombol.disabled = true;
+        tombol.textContent = "Akun Anda";
+      } else {
+        tombol.onclick = () => {
+          ubahPeranAnggota(anggota.id, pilihan.value);
+        };
+      }
+
+      baris.appendChild(username);
       baris.appendChild(peran);
-      baris.appendChild(tanggal);
+      baris.appendChild(pilihan);
+      baris.appendChild(tombol);
 
       wadah.appendChild(baris);
     });
 
   } catch (error) {
-    wadah.textContent = "Gagal memuat anggota: " + error.message;
+    wadah.textContent =
+      "Gagal memuat anggota: " + error.message;
   }
 }
 </script>
