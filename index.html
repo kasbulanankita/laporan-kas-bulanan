@@ -65,7 +65,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BLZE0ccJ6x_saeOuldDfSQ_CPlVxoML
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
-);
+); 
+console.log("Supabase berhasil dimuat:", !!supabaseClient);
+  
 </script>
 </head>
 <body>
