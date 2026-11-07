@@ -454,11 +454,22 @@ async function mulaiSesi(user) {
   dataKas = dataKasSemua.slice();
   penggunaAktif = user;
 
+  // Ambil username dari profil pengguna, bukan menampilkan alamat email.
+  const { data: profilPengguna } = await supabaseClient
+    .from("profiles")
+    .select("username")
+    .eq("id", user.id)
+    .maybeSingle();
+  const usernamePengguna =
+    (profilPengguna && profilPengguna.username) ||
+    (user.user_metadata && user.user_metadata.username) ||
+    "Pengguna";
+
   const labelPeran = roleAktif === "super_admin" ? "Super Admin" :
     roleAktif === "admin" ? "Admin Kelompok" :
     roleAktif === "anggota" ? "Anggota" : "Belum bergabung dengan kelompok";
 
-  $("infoPengguna").textContent = "Akun: " + user.email + " | Peran: " + labelPeran +
+  $("infoPengguna").textContent = "Username: " + usernamePengguna + " | Peran: " + labelPeran +
     (groupStatus && groupStatus.nama ? " | Kelompok: " + groupStatus.nama : "");
 
   // Nama kelompok untuk Admin dan Anggota mengikuti keanggotaan akun.
