@@ -13,6 +13,7 @@ header h1{margin:0 0 8px;font-size:24px}
 .card{background:white;padding:18px;border-radius:12px;margin-top:16px;box-shadow:0 2px 8px #0000000d}
 h2{font-size:18px;margin-top:0}
 input,select,button{width:100%;padding:12px;margin:6px 0;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+#namaKas.nama-kelompok-terkunci{font-weight:800;text-transform:uppercase;background:#f8fafc;color:#14532d;letter-spacing:.4px}
 button{background:#15803d;color:white;border:0;font-weight:bold;cursor:pointer}
 button.delete{background:#dc2626}
 button.export{background:#2563eb}
@@ -212,11 +213,11 @@ th,td{border:1px solid #ccc}
 <p style="font-size:11px;opacity:.8;margin:6px 0 0">Pemeriksaan aplikasi v3</p>
 
 <div class="no-print" style="margin-top:15px">
-    <label for="namaKas">Nama Kas / Kelompok</label>
+    <label for="namaKas">Nama Kelompok</label>
     <input
         type="text"
         id="namaKas"
-        placeholder="Contoh: KAS KELOMPOK ELANG"
+        placeholder="Nama kelompok otomatis"
         style="width:100%;padding:12px;margin-top:6px"
     >
 </div>
@@ -459,6 +460,22 @@ async function mulaiSesi(user) {
 
   $("infoPengguna").textContent = "Akun: " + user.email + " | Peran: " + labelPeran +
     (groupStatus && groupStatus.nama ? " | Kelompok: " + groupStatus.nama : "");
+
+  // Nama kelompok untuk Admin dan Anggota mengikuti keanggotaan akun.
+  const inputNamaKelompok = $("namaKas");
+  const judulNamaKelompok = $("judulKas");
+  if (roleAktif === "admin" || roleAktif === "anggota") {
+    const namaKelompok = groupStatus && groupStatus.nama ? groupStatus.nama : "";
+    inputNamaKelompok.value = namaKelompok.toUpperCase();
+    inputNamaKelompok.readOnly = true;
+    inputNamaKelompok.classList.add("nama-kelompok-terkunci");
+    judulNamaKelompok.textContent = namaKelompok ? namaKelompok.toUpperCase() : "Laporan Kas Bulanan";
+  } else {
+    inputNamaKelompok.readOnly = false;
+    inputNamaKelompok.classList.remove("nama-kelompok-terkunci");
+    inputNamaKelompok.value = localStorage.getItem("namaKas") || "";
+    judulNamaKelompok.textContent = inputNamaKelompok.value.trim() || "Laporan Kas Bulanan";
+  }
 
   const container = document.querySelector(".container");
   container.classList.add("authenticated");
