@@ -840,7 +840,11 @@ $("jumlah").value = x.jumlah;
 $("judulForm").textContent = "Edit Transaksi";
 $("tombolSimpan").textContent = "Simpan Perubahan";
 $("tombolBatal").style.display = "block";
-$("formKas").scrollIntoView({behavior:"smooth"});
+
+// Arahkan Admin ke kartu formulir agar proses edit terlihat jelas,
+// termasuk pada layar HP ketika posisi awal berada di riwayat transaksi.
+$("formTransaksiCard").scrollIntoView({behavior:"smooth", block:"start"});
+$("tanggal").focus({preventScroll:true});
 }
 
 function batalEdit(){
