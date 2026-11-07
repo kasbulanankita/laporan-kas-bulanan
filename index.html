@@ -1514,9 +1514,10 @@ async function hapusKeanggotaan(gid,uid){if(roleAktif!=="super_admin"||!confirm(
 async function ubahStatusKelompok(id,statusBaru){if(roleAktif!=="super_admin"||!confirm("Ubah status kelompok menjadi "+statusBaru+"? Riwayat transaksi tetap disimpan."))return;const {error}=await supabaseClient.from("kelompok").update({status:statusBaru}).eq("id",id);if(error){$("statusDashboard").textContent="Gagal mengubah status: "+error.message;return;}await muatDashboardSuperAdmin();}
 $("buatKelompokBtn").addEventListener("click",buatKelompokBaru);$("tetapkanAdminBtn").addEventListener("click",tetapkanAdminKelompok);
 function toggleManajemenAnggota() {
+  if (roleAktif !== "admin" || !aksesKelolaTransaksi) return;
   const panel = document.getElementById("adminUsersCard");
-
   panel.classList.toggle("terbuka");
+  if (panel.classList.contains("terbuka")) muatDaftarAnggota();
 }
 
 async function muatDaftarAnggota() {
