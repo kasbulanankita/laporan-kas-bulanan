@@ -70,6 +70,7 @@ th,td{border:1px solid #ccc}
 .container.authenticated.super-admin #dashboardSuperAdmin { display:block; }
 .dashboard-super-admin-header { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
 .dashboard-super-admin-header h2 { margin:0; }
+.dashboard-super-admin-footer { display:flex; justify-content:flex-end; margin-top:16px; padding-top:12px; border-top:1px solid #e5e7eb; }
 #dashboardSuperAdmin.collapsed > #isiDashboardSuperAdmin { display:none !important; }
 .container.authenticated:not(.admin) #tombolPulihkanOtomatis,
 .container.authenticated:not(.admin) #tombolPilihRestore {
@@ -222,6 +223,7 @@ th,td{border:1px solid #ccc}
 <button type="button" class="export" id="muatAkunBelumBergabungBtn">↻ Muat Ulang Daftar Akun</button>
 <div id="statusAkunBelumBergabung" class="info"></div>
 <div id="daftarAkunBelumBergabung"><p class="info">Memuat daftar akun...</p></div>
+<div class="dashboard-super-admin-footer"><button type="button" id="toggleDashboardSuperAdminBawah" class="export" aria-expanded="true" aria-controls="isiDashboardSuperAdmin">▼ Minimalkan Dashboard</button></div>
 </div>
 </div>
 <header>
@@ -1598,13 +1600,18 @@ async function ubahStatusAkunBelumBergabung(uid,username,nonaktifkan){
 $("muatAkunBelumBergabungBtn").addEventListener("click",muatDaftarAkunBelumBergabung);
 
 const tombolToggleDashboardSuperAdmin = $("toggleDashboardSuperAdmin");
-tombolToggleDashboardSuperAdmin.addEventListener("click", function () {
+const tombolToggleDashboardSuperAdminBawah = $("toggleDashboardSuperAdminBawah");
+function toggleDashboardSuperAdmin() {
   if (roleAktif !== "super_admin") return;
   const dashboard = $("dashboardSuperAdmin");
   const diminimalkan = dashboard.classList.toggle("collapsed");
-  tombolToggleDashboardSuperAdmin.setAttribute("aria-expanded", String(!diminimalkan));
-  tombolToggleDashboardSuperAdmin.textContent = diminimalkan ? "＋ Buka Dashboard" : "▼ Minimalkan Dashboard";
-});
+  [tombolToggleDashboardSuperAdmin, tombolToggleDashboardSuperAdminBawah].forEach(tombol => {
+    tombol.setAttribute("aria-expanded", String(!diminimalkan));
+    tombol.textContent = diminimalkan ? "＋ Buka Dashboard" : "▼ Minimalkan Dashboard";
+  });
+}
+tombolToggleDashboardSuperAdmin.addEventListener("click", toggleDashboardSuperAdmin);
+tombolToggleDashboardSuperAdminBawah.addEventListener("click", toggleDashboardSuperAdmin);
 
 $("buatKelompokBtn").addEventListener("click",buatKelompokBaru);$("tetapkanAdminBtn").addEventListener("click",tetapkanAdminKelompok);
 function toggleManajemenAnggota() {
