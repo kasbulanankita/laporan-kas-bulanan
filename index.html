@@ -212,6 +212,11 @@ th,td{border:1px solid #ccc}
 <h3>Buat Kelompok</h3><input id="namaKelompokBaru" maxlength="80" placeholder="Nama kelompok baru"><button type="button" id="buatKelompokBtn">＋ Buat Kelompok</button>
 <h3>Penetapan Admin</h3><label for="pilihKelompokAdmin">Kelompok</label><select id="pilihKelompokAdmin"></select><label for="pilihPenggunaAdmin">Akun terdaftar</label><select id="pilihPenggunaAdmin"></select><button type="button" id="tetapkanAdminBtn">Tetapkan sebagai Admin</button>
 <p id="statusDashboard" class="info"></p><h3>Daftar Kelompok dan Anggota</h3><div id="daftarKelompokSuperAdmin">Memuat...</div>
+<h3>Manajemen Akun Belum Bergabung</h3>
+<p class="info">Hanya Super Admin yang dapat menonaktifkan atau mengaktifkan kembali akun yang belum tergabung dalam kelompok. Akun yang dinonaktifkan tidak dapat login. Riwayat transaksi tidak dihapus.</p>
+<button type="button" class="export" id="muatAkunBelumBergabungBtn">↻ Muat Ulang Daftar Akun</button>
+<div id="statusAkunBelumBergabung" class="info"></div>
+<div id="daftarAkunBelumBergabung"><p class="info">Memuat daftar akun...</p></div>
 </div>
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
@@ -1512,6 +1517,7 @@ async function muatDashboardSuperAdmin(){
  $("filterKelompokWrap").style.display="block";const filter=$("filterKelompok"),old=filter.value||"semua";filter.replaceChildren(new Option("Semua kelompok + pribadi","semua"));groups.forEach(g=>filter.add(new Option(g.nama,g.id)));filter.value=[...filter.options].some(o=>o.value===old)?old:"semua";dataKas=filter.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===filter.value);
  $("kelompokTransaksiWrap").style.display="block";const tx=$("kelompokTransaksi"),oldTx=tx.value;tx.replaceChildren(new Option("Transaksi pribadi",""));groups.filter(g=>g.status==="aktif").forEach(g=>tx.add(new Option(g.nama,g.id)));if([...tx.options].some(o=>o.value===oldTx))tx.value=oldTx;
  status.textContent="Dashboard siap. Penetapan Admin hanya dilakukan Super Admin.";
+ await muatDaftarAkunBelumBergabung();
  }catch(e){status.textContent="Gagal memuat dashboard: "+e.message;}
 }
 async function buatKelompokBaru(){if(roleAktif!=="super_admin"||!penggunaAktif)return;const nama=$("namaKelompokBaru").value.trim();if(!nama){$("statusDashboard").textContent="Masukkan nama kelompok.";return;}const {error}=await supabaseClient.from("kelompok").insert({nama,dibuat_oleh:penggunaAktif.id});if(error){$("statusDashboard").textContent="Gagal membuat kelompok: "+error.message;return;}$("namaKelompokBaru").value="";await muatDashboardSuperAdmin();}
@@ -1519,6 +1525,59 @@ async function tetapkanAdminKelompok(){if(roleAktif!=="super_admin")return;const
 async function ubahRoleKeanggotaan(gid,uid,role){if(roleAktif!=="super_admin")return;const {error}=await supabaseClient.from("anggota_kelompok").update({role}).eq("kelompok_id",gid).eq("user_id",uid);if(error){$("statusDashboard").textContent="Gagal mengubah peran: "+error.message;return;}await muatDashboardSuperAdmin();}
 async function hapusKeanggotaan(gid,uid){if(roleAktif!=="super_admin"||!confirm("Keluarkan akun dari kelompok? Riwayat transaksi tetap tersimpan."))return;const {error}=await supabaseClient.from("anggota_kelompok").delete().eq("kelompok_id",gid).eq("user_id",uid);if(error){$("statusDashboard").textContent="Gagal mengeluarkan anggota: "+error.message;return;}await muatDashboardSuperAdmin();}
 async function ubahStatusKelompok(id,statusBaru){if(roleAktif!=="super_admin"||!confirm("Ubah status kelompok menjadi "+statusBaru+"? Riwayat transaksi tetap disimpan."))return;const {error}=await supabaseClient.from("kelompok").update({status:statusBaru}).eq("id",id);if(error){$("statusDashboard").textContent="Gagal mengubah status: "+error.message;return;}await muatDashboardSuperAdmin();}
+
+async function muatDaftarAkunBelumBergabung(){
+ if(roleAktif!=="super_admin")return;
+ const wadah=$("daftarAkunBelumBergabung"),status=$("statusAkunBelumBergabung");
+ wadah.textContent="Memuat daftar akun...";
+ status.textContent="";
+ const {data,error}=await supabaseClient.functions.invoke("manage-unassigned-users",{body:{action:"list"}});
+ if(error){wadah.textContent="Gagal memuat akun: "+error.message;return;}
+ if(data?.error){wadah.textContent="Gagal memuat akun: "+data.error;return;}
+ const users=data?.users||[];
+ wadah.replaceChildren();
+ if(!users.length){wadah.textContent="Tidak ada akun yang belum tergabung dalam kelompok.";return;}
+ users.forEach(user=>{
+  const row=document.createElement("div");
+  row.style.cssText="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #e2e8f0";
+  const details=document.createElement("div");
+  details.style.flex="1";
+  const name=document.createElement("strong");
+  name.textContent=user.username||"Tanpa username";
+  const email=document.createElement("div");
+  email.className="info";
+  email.textContent=user.email||user.id;
+  const state=document.createElement("div");
+  state.className="info";
+  state.textContent=user.disabled?"Status: Nonaktif":"Status: Aktif";
+  details.append(name,email,state);
+  const action=document.createElement("button");
+  action.type="button";
+  action.style.width="auto";
+  action.className=user.disabled?"edit":"delete";
+  action.textContent=user.disabled?"Aktifkan Kembali":"Nonaktifkan";
+  action.addEventListener("click",()=>ubahStatusAkunBelumBergabung(user.id,user.username,!user.disabled));
+  row.append(details,action);
+  wadah.appendChild(row);
+ });
+ status.textContent="Jumlah akun belum bergabung: "+users.length;
+}
+async function ubahStatusAkunBelumBergabung(uid,username,nonaktifkan){
+ if(roleAktif!=="super_admin")return;
+ const tindakan=nonaktifkan?"menonaktifkan":"mengaktifkan kembali";
+ if(!confirm("Apakah Anda yakin ingin "+tindakan+" akun "+(username||uid)+"?"))return;
+ const status=$("statusAkunBelumBergabung");
+ status.textContent="Memproses perubahan status akun...";
+ const {data,error}=await supabaseClient.functions.invoke("manage-unassigned-users",{
+  body:{action:nonaktifkan?"disable":"enable",user_id:uid}
+ });
+ if(error){status.textContent="Gagal mengubah status: "+error.message;return;}
+ if(data?.error){status.textContent="Gagal mengubah status: "+data.error;return;}
+ status.textContent=data?.message||"Status akun berhasil diperbarui.";
+ await muatDaftarAkunBelumBergabung();
+}
+$("muatAkunBelumBergabungBtn").addEventListener("click",muatDaftarAkunBelumBergabung);
+
 $("buatKelompokBtn").addEventListener("click",buatKelompokBaru);$("tetapkanAdminBtn").addEventListener("click",tetapkanAdminKelompok);
 function toggleManajemenAnggota() {
   if (roleAktif !== "admin" || !aksesKelolaTransaksi) return;
