@@ -325,15 +325,10 @@ $("formLogin").addEventListener("submit", async function(e) {
 
   statusAutentikasi("Sedang login...");
 
-  const { data, error } = await supabaseClient.auth.signUp({
-  email,
-  password,
-  options: {
-    data: {
-      username: username
-    }
-  }
-});
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
 
   if (error) {
     statusAutentikasi("Login gagal: " + error.message);
@@ -354,9 +349,14 @@ const password = $("passwordDaftar").value;
   statusAutentikasi("Sedang mendaftarkan akun...");
 
   const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
+  email,
+  password,
+  options: {
+    data: {
+      username: username
+    }
+  }
+});
 
   if (error) {
     statusAutentikasi("Pendaftaran gagal: " + error.message);
