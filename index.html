@@ -116,6 +116,9 @@ th,td{border:1px solid #ccc}
   display: block;
 }
 
+/* Nama kas di Super Admin mengikuti filter laporan, bukan input manual */
+.container.authenticated.super-admin #namaKasWrap { display:none !important; }
+
 /* Super Admin tidak menggunakan menu Manajemen Anggota Admin kelompok */
 .container.authenticated.super-admin #tombolManajemenAnggota,
 .container.authenticated.super-admin #adminUsersCard {
@@ -231,7 +234,7 @@ th,td{border:1px solid #ccc}
 <p>Catatan pemasukan dan pengeluaran kas</p>
 <p style="font-size:11px;opacity:.8;margin:6px 0 0">Pemeriksaan aplikasi v3</p>
 
-<div class="no-print" style="margin-top:15px">
+<div id="namaKasWrap" class="no-print" style="margin-top:15px">
     <label for="namaKas">Nama Kas / Kelompok</label>
     <input
         type="text"
@@ -248,7 +251,7 @@ th,td{border:1px solid #ccc}
 </header>
 
 <div class="card no-print">
-<h2>Filter Laporan</h2><div id="filterKelompokWrap" style="display:none"><label for="filterKelompok">Kelompok laporan</label><select id="filterKelompok"><option value="semua">Semua kelompok + pribadi</option></select></div>
+<h2>Filter Laporan</h2><div id="filterKelompokWrap" style="display:none"><label for="filterKelompok">Kelompok laporan</label><select id="filterKelompok"><option value="semua">Semua Kelompok</option><option value="pribadi">Pribadi Super Admin</option></select></div>
 <input type="month" id="bulan">
 </div>
 
@@ -508,7 +511,7 @@ async function mulaiSesi(user) {
   }
 
   if (roleAktif === "super_admin") await muatDashboardSuperAdmin();
-  if (roleAktif === "super_admin") $("filterKelompok").addEventListener("change",function(){dataKas=this.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===this.value);tampilkan();});
+  if (roleAktif === "super_admin") $("filterKelompok").onchange = terapkanFilterLaporanSuperAdmin;
   tampilkan();
 }
 
@@ -565,6 +568,41 @@ try {
 }
 
 let idEdit = null;
+
+function namaLaporanAktif(){
+  if(roleAktif !== "super_admin"){
+    return $("namaKas")?.value.trim() || "Laporan Kas Bulanan";
+  }
+  const filter = $("filterKelompok");
+  const pilihan = filter?.value || "semua";
+  if(pilihan === "pribadi") return "Laporan Pribadi Super Admin";
+  if(pilihan === "semua") return "Laporan Semua Kelompok";
+  return filter?.selectedOptions?.[0]?.textContent || "Laporan Kelompok";
+}
+
+function perbaruiJudulLaporan(){
+  const judul = $("judulKas");
+  if(judul) judul.textContent = namaLaporanAktif().toUpperCase();
+}
+
+function terapkanFilterLaporanSuperAdmin(){
+  if(roleAktif !== "super_admin") return;
+  const pilihan = $("filterKelompok").value;
+  if(pilihan === "semua"){
+    // Hanya transaksi yang terhubung ke kelompok; transaksi pribadi tidak dicampur.
+    dataKas = dataKasSemua.filter(x => x.kelompok_id !== null);
+  }else if(pilihan === "pribadi"){
+    // Hanya transaksi tanpa kelompok yang dibuat oleh akun Super Admin.
+    dataKas = dataKasSemua.filter(x =>
+      x.user_id === SUPER_ADMIN_ID && x.kelompok_id === null
+    );
+  }else{
+    dataKas = dataKasSemua.filter(x => x.kelompok_id === pilihan);
+  }
+  perbaruiJudulLaporan();
+  tampilkan();
+}
+
 // Pengaturan nama kas
 window.addEventListener("DOMContentLoaded", function(){
 
@@ -578,6 +616,7 @@ window.addEventListener("DOMContentLoaded", function(){
   function updateJudulKas(){
     const nama = inputNama.value.trim();
     judul.textContent = nama || "Laporan Kas Bulanan";
+    if (roleAktif === "super_admin") perbaruiJudulLaporan();
   }
 
   updateJudulKas();
@@ -898,7 +937,7 @@ month:"long",
 year:"numeric"
 });
 
-const namaKas = $("namaKas").value.trim() || "Laporan Kas";
+const namaKas = namaLaporanAktif() || "Laporan Kas";
 
 document.title = namaKas + " - " + namaBulan;
 window.print();
@@ -931,7 +970,7 @@ function eksporCSV(){
   });
 
   const rows = [
-    ["Nama Kas / Kelompok", namaKas],
+    ["Nama Laporan", namaKas],
     ["Periode", namaBulan],
     [],
     ["Tanggal","Keterangan","Jenis","Jumlah"],
@@ -1055,7 +1094,7 @@ function simpanLaporanGambar(){
     return;
   }
 
-  const namaKas = $("namaKas").value.trim() || "Laporan Kas Bulanan";
+  const namaKas = namaLaporanAktif() || "Laporan Kas Bulanan";
 
   const transaksi = dataKas
     .filter(x => x.tanggal.slice(0,7) === bulan)
@@ -1536,7 +1575,7 @@ async function muatDashboardSuperAdmin(){
  const toggle=document.createElement("button");toggle.type="button";toggle.className=g.status==="aktif"?"cancel":"edit";toggle.textContent=g.status==="aktif"?"Arsipkan Kelompok":"Aktifkan Kembali";toggle.onclick=()=>ubahStatusKelompok(g.id,g.status==="aktif"?"arsip":"aktif");card.append(title,info,toggle);
  gm.forEach(m=>{const row=document.createElement("div");row.style.cssText="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #eee;padding:8px 0";const name=document.createElement("span");name.style.flex="1";name.textContent=(byId.get(m.user_id)?.username||m.user_id.slice(0,8))+" — "+m.role;const sel=document.createElement("select");sel.style.width="auto";sel.add(new Option("Admin","admin"));sel.add(new Option("Anggota","anggota"));sel.value=m.role;const save=document.createElement("button");save.type="button";save.style.width="auto";save.textContent="Ubah";save.onclick=()=>ubahRoleKeanggotaan(g.id,m.user_id,sel.value);const del=document.createElement("button");del.type="button";del.className="delete";del.style.width="auto";del.textContent="Keluarkan";del.onclick=()=>hapusKeanggotaan(g.id,m.user_id);row.append(name,sel,save,del);card.appendChild(row);});daftar.appendChild(card);
  });
- $("filterKelompokWrap").style.display="block";const filter=$("filterKelompok"),old=filter.value||"semua";filter.replaceChildren(new Option("Semua kelompok + pribadi","semua"));groups.forEach(g=>filter.add(new Option(g.nama,g.id)));filter.value=[...filter.options].some(o=>o.value===old)?old:"semua";dataKas=filter.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===filter.value);
+ $("filterKelompokWrap").style.display="block";const filter=$("filterKelompok"),old=filter.value||"semua";filter.replaceChildren(new Option("Semua Kelompok","semua"),new Option("Pribadi Super Admin","pribadi"));groups.forEach(g=>filter.add(new Option(g.nama,g.id)));filter.value=[...filter.options].some(o=>o.value===old)?old:"semua";terapkanFilterLaporanSuperAdmin();
  $("kelompokTransaksiWrap").style.display="block";const tx=$("kelompokTransaksi"),oldTx=tx.value;tx.replaceChildren(new Option("Transaksi pribadi",""));groups.filter(g=>g.status==="aktif").forEach(g=>tx.add(new Option(g.nama,g.id)));if([...tx.options].some(o=>o.value===oldTx))tx.value=oldTx;
  status.textContent="Dashboard siap. Penetapan Admin hanya dilakukan Super Admin.";
  await muatDaftarAkunBelumBergabung();
