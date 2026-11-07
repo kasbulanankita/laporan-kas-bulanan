@@ -396,7 +396,7 @@ async function mulaiSesi(user) {
   const { data: profil, error: errorProfil } =
     await supabaseClient
       .from("profiles")
-      .select("role")
+      .select("role, username")
       .eq("id", user.id)
       .single();
 
@@ -430,8 +430,13 @@ async function mulaiSesi(user) {
   penggunaAktif = user;
   roleAktif = profil.role;
 
+  const usernamePengguna =
+    profil.username ||
+    (user.user_metadata && user.user_metadata.username) ||
+    "Pengguna";
+
   $("infoPengguna").textContent =
-    "Akun: " + user.email +
+    "Username: " + usernamePengguna +
     " | Peran: " +
     (roleAktif === "admin" ? "Admin" : "Anggota");
 
