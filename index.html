@@ -243,6 +243,7 @@ th,td{border:1px solid #ccc}
         style="width:100%;padding:12px;margin-top:6px"
     >
 </div>
+<div id="namaKasKelompokTetap" style="display:none;margin-top:15px;font-weight:bold"></div>
 
 <button id="installButton" style="display:none;background:#2563eb;margin-top:12px">
 📲 Instal Aplikasi
@@ -491,6 +492,19 @@ async function mulaiSesi(user) {
     roleAktif === "admin" ? "Admin Kelompok" :
     roleAktif === "anggota" ? "Anggota" : "Belum bergabung dengan kelompok";
 
+  // Anggota tidak mengisi nama kas secara manual; nama mengikuti kelompoknya.
+  const labelKelompokTetap = $("namaKasKelompokTetap");
+  if (roleAktif === "anggota" && groupStatus && groupStatus.nama) {
+    $("namaKas").value = groupStatus.nama;
+    $("namaKasWrap").style.display = "none";
+    labelKelompokTetap.textContent = groupStatus.nama;
+    labelKelompokTetap.style.display = "block";
+  } else {
+    labelKelompokTetap.textContent = "";
+    labelKelompokTetap.style.display = "none";
+    $("namaKasWrap").style.display = "";
+  }
+
   const usernamePengguna = profil?.username ||
     (user.user_metadata && user.user_metadata.username) || "Pengguna";
   $("infoPengguna").textContent = "Username: " + usernamePengguna +
@@ -534,6 +548,9 @@ $("tombolLogout").addEventListener("click", async function() {
   document.querySelector(".container").classList.remove("authenticated", "admin", "super-admin");
 
   $("infoPengguna").textContent = "";
+  $("namaKasKelompokTetap").textContent = "";
+  $("namaKasKelompokTetap").style.display = "none";
+  $("namaKasWrap").style.display = "";
   $("formLogin").reset();
   $("formDaftar").reset();
 
