@@ -98,27 +98,67 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Akun Super Admin tidak dapat dinonaktifkan." }, 400);
   }
 
-  const { data: membership, error: membershipError } = await admin
-    .from("anggota_kelompok")
-    .select("user_id")
-    .eq("user_id", body.user_id)
-    .maybeSingle();
-  if (membershipError) return json({ error: membershipError.message }, 500);
-  if (membership) {
-    return json({ error: "Akun sudah tergabung dalam kelompok. Keluarkan dari kelompok terlebih dahulu." }, 409);
+  const isDisable = body.action === "disable";
+  const claimAction = isDisable ? "claim_disable" : "claim_enable";
+  const finishAction = isDisable ? "finish_disable" : "finish_enable";
+  const rollbackAction = isDisable ? "rollback_disable" : "rollback_enable";
+
+  // Claim the account-state row under a database row lock. Membership triggers
+  // take the same lock, so membership creation and account disabling cannot race.
+  const { error: claimError } = await admin.rpc("manage_unassigned_account_state", {
+    p_user_id: body.user_id,
+    p_action: claimAction,
+  });
+  if (claimError) {
+    const status = /sudah tergabung|status akun tidak memungkinkan/i.test(claimError.message) ? 409 : 500;
+    return json({ error: claimError.message }, status);
   }
 
-  const { data: target, error: targetError } = await admin.auth.admin.getUserById(body.user_id);
-  if (targetError || !target.user) return json({ error: "Akun tidak ditemukan." }, 404);
+  const rollback = async () => {
+    const { error } = await admin.rpc("manage_unassigned_account_state", {
+      p_user_id: body.user_id!,
+      p_action: rollbackAction,
+    });
+    return error;
+  };
 
-  const ban_duration = body.action === "disable" ? BAN_DURATION : "none";
-  const { error: updateError } = await admin.auth.admin.updateUserById(body.user_id, { ban_duration });
-  if (updateError) return json({ error: updateError.message }, 500);
+  const { data: target, error: targetError } = await admin.auth.admin.getUserById(body.user_id);
+  if (targetError || !target.user) {
+    const rollbackError = await rollback();
+    return json({
+      error: targetError?.message || "Akun tidak ditemukan.",
+      rollback_error: rollbackError?.message,
+    }, 404);
+  }
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(body.user_id, {
+    ban_duration: isDisable ? BAN_DURATION : "none",
+  });
+  if (updateError) {
+    const rollbackError = await rollback();
+    return json({
+      error: updateError.message,
+      rollback_error: rollbackError?.message,
+    }, 500);
+  }
+
+  const { error: finishError } = await admin.rpc("manage_unassigned_account_state", {
+    p_user_id: body.user_id,
+    p_action: finishAction,
+  });
+  if (finishError) {
+    // Fail closed: the state remains disabling/enabling, so no new membership
+    // can be created until the operation is retried and finalized.
+    return json({
+      error: "Status Auth berubah, tetapi finalisasi status database gagal. Ulangi aksi yang sama untuk menyelesaikan proses.",
+      details: finishError.message,
+    }, 500);
+  }
 
   return json({
     success: true,
     action: body.action,
-    message: body.action === "disable"
+    message: isDisable
       ? "Akun berhasil dinonaktifkan."
       : "Akun berhasil diaktifkan kembali.",
   });
