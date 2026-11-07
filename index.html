@@ -111,6 +111,12 @@ th,td{border:1px solid #ccc}
 .container.authenticated.admin #adminUsersCard.terbuka {
   display: block;
 }
+
+/* Super Admin tidak menggunakan menu Manajemen Anggota Admin kelompok */
+.container.authenticated.super-admin #tombolManajemenAnggota,
+.container.authenticated.super-admin #adminUsersCard {
+  display: none !important;
+}
 </style>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2563eb">
@@ -837,6 +843,7 @@ async function hapusSemua() {
     if (error) throw error;
 
     dataKas = [];
+    dataKasSemua = [];
 
     simpan();
     batalEdit();
