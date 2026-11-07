@@ -60,12 +60,10 @@ th,td{border:1px solid #ccc}
 .container.authenticated > #authCard {
   display: none !important;
 }
-/* Form transaksi hanya untuk Admin */
-.container.authenticated:not(.admin) #formTransaksiCard {
-  display: none !important;
-}.container.authenticated:not(.admin) #tombolHapusSemua {
-  display: none !important;
-}
+/* Hak tampilan berdasarkan keanggotaan kelompok */
+.container.authenticated:not(.admin) #formTransaksiCard { display:none !important; }
+#tombolHapusSemua,#tombolPulihkanOtomatis,#tombolPilihRestore { display:none !important; }
+#tombolManajemenAnggota,#adminUsersCard { display:none !important; }
 .container.authenticated:not(.admin) #tombolPulihkanOtomatis,
 .container.authenticated:not(.admin) #tombolPilihRestore {
   display: none !important;
@@ -324,6 +322,9 @@ const supabaseClient = window.supabase.createClient(
 // Status pengguna yang sedang login
 let penggunaAktif = null;
 let roleAktif = null;
+let kelompokAktifId = null;
+let aksesKelolaTransaksi = false;
+const SUPER_ADMIN_ID = "0a88c330-e26d-462b-a914-62b17a8dc06f";
 
 // Fungsi menampilkan status autentikasi
 function statusAutentikasi(pesan) {
@@ -388,59 +389,79 @@ const password = $("passwordDaftar").value;
   await mulaiSesi(data.user);
 });
  
-// Memeriksa profil dan membuka aplikasi
+// Memeriksa keanggotaan dan membuka aplikasi sesuai peran baru
 async function mulaiSesi(user) {
-  statusAutentikasi("Memuat data transaksi...");
+  statusAutentikasi("Memeriksa keanggotaan dan memuat transaksi...");
 
-  // Ambil profil dan peran pengguna
-  const { data: profil, error: errorProfil } =
-    await supabaseClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+  const isSuperAdmin = user.id === SUPER_ADMIN_ID;
+  let membership = null;
+  let groupStatus = null;
 
-  if (errorProfil) {
-    statusAutentikasi("Gagal membaca profil: " + errorProfil.message);
-    return;
+  if (!isSuperAdmin) {
+    const { data, error } = await supabaseClient
+      .from("anggota_kelompok")
+      .select("kelompok_id, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      statusAutentikasi("Gagal membaca keanggotaan: " + error.message);
+      return;
+    }
+    membership = data;
+
+    if (membership) {
+      const { data: group, error: groupError } = await supabaseClient
+        .from("kelompok")
+        .select("status, nama")
+        .eq("id", membership.kelompok_id)
+        .maybeSingle();
+
+      if (groupError) {
+        statusAutentikasi("Gagal membaca kelompok: " + groupError.message);
+        return;
+      }
+      groupStatus = group;
+    }
   }
 
-  // Ambil transaksi dari database
-  // RLS Supabase otomatis membatasi data anggota.
-  // Admin dapat melihat seluruh transaksi.
-  const { data: transaksi, error: errorTransaksi } =
-    await supabaseClient
-      .from("transaksi")
-      .select("id, user_id, tanggal, jenis, keterangan, jumlah")
-      .order("tanggal", { ascending: true });
+  roleAktif = isSuperAdmin ? "super_admin" : membership ? membership.role : "belum_bergabung";
+  kelompokAktifId = membership ? membership.kelompok_id : null;
+  aksesKelolaTransaksi = isSuperAdmin ||
+    (roleAktif === "admin" && groupStatus && groupStatus.status === "aktif");
+
+  const { data: transaksi, error: errorTransaksi } = await supabaseClient
+    .from("transaksi")
+    .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
+    .order("tanggal", { ascending: true });
 
   if (errorTransaksi) {
-    statusAutentikasi(
-      "Gagal memuat transaksi: " + errorTransaksi.message
-    );
+    statusAutentikasi("Gagal memuat transaksi: " + errorTransaksi.message);
     return;
   }
 
-  // Ganti data tampilan dengan data dari database
-  dataKas = transaksi.map(item => ({
-    ...item,
-    jumlah: Number(item.jumlah)
-  }));
-
+  dataKas = (transaksi || []).map(item => ({ ...item, jumlah: Number(item.jumlah) }));
   penggunaAktif = user;
-  roleAktif = profil.role;
 
-  $("infoPengguna").textContent =
-    "Akun: " + user.email +
-    " | Peran: " +
-    (roleAktif === "admin" ? "Admin" : "Anggota");
+  const labelPeran = roleAktif === "super_admin" ? "Super Admin" :
+    roleAktif === "admin" ? "Admin Kelompok" :
+    roleAktif === "anggota" ? "Anggota" : "Belum bergabung dengan kelompok";
 
-  document.querySelector(".container").classList.add("authenticated");
-document.querySelector(".container").classList.toggle(
-  "admin",
-  roleAktif === "admin"
-);
-  statusAutentikasi("");
+  $("infoPengguna").textContent = "Akun: " + user.email + " | Peran: " + labelPeran +
+    (groupStatus && groupStatus.nama ? " | Kelompok: " + groupStatus.nama : "");
+
+  const container = document.querySelector(".container");
+  container.classList.add("authenticated");
+  container.classList.toggle("admin", aksesKelolaTransaksi);
+  container.classList.toggle("super-admin", isSuperAdmin);
+
+  if (roleAktif === "belum_bergabung") {
+    statusAutentikasi("Akun berhasil masuk. Anda belum ditambahkan ke kelompok oleh Super Admin.");
+  } else if (roleAktif === "admin" && !aksesKelolaTransaksi) {
+    statusAutentikasi("Kelompok sedang diarsipkan. Laporan tetap dapat dilihat, tetapi transaksi tidak dapat diubah.");
+  } else {
+    statusAutentikasi("");
+  }
 
   tampilkan();
 }
@@ -458,8 +479,10 @@ $("tombolLogout").addEventListener("click", async function() {
 
   penggunaAktif = null;
   roleAktif = null;
+  kelompokAktifId = null;
+  aksesKelolaTransaksi = false;
 
-  document.querySelector(".container").classList.remove("authenticated");
+  document.querySelector(".container").classList.remove("authenticated", "admin", "super-admin");
 
   $("infoPengguna").textContent = "";
   $("formLogin").reset();
@@ -603,7 +626,7 @@ td.className = x.jenis === "masuk" ? "income" : "expense";
 tr.appendChild(td);
 });
 
-if (roleAktif === "admin") {
+if (aksesKelolaTransaksi) {
   const td = document.createElement("td");
   td.className = "actions no-print";
 
@@ -630,7 +653,14 @@ $("daftarKas").appendChild(tr);
 $("formKas").addEventListener("submit", async e => {
   e.preventDefault();
 
+  if (!aksesKelolaTransaksi || !penggunaAktif) {
+    alert("Akun ini tidak memiliki izin untuk mengubah transaksi.");
+    return;
+  }
+
   const transaksi = {
+    user_id: penggunaAktif.id,
+    kelompok_id: roleAktif === "super_admin" ? null : kelompokAktifId,
     tanggal: $("tanggal").value,
     jenis: $("jenis").value,
     keterangan: $("keterangan").value.trim(),
@@ -656,7 +686,7 @@ $("formKas").addEventListener("submit", async e => {
         .from("transaksi")
         .update(transaksi)
         .eq("id", idEdit)
-        .select("id, tanggal, jenis, keterangan, jumlah")
+        .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
         .single();
 
       if (error) throw error;
@@ -679,7 +709,7 @@ $("formKas").addEventListener("submit", async e => {
       const { data, error } = await supabaseClient
         .from("transaksi")
         .insert(transaksi)
-        .select("id, tanggal, jenis, keterangan, jumlah")
+        .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
         .single();
 
       if (error) throw error;
@@ -714,6 +744,7 @@ $("formKas").addEventListener("submit", async e => {
 
 
 function mulaiEdit(id){
+if (!aksesKelolaTransaksi) return;
 const x = dataKas.find(item => item.id === id);
 if(!x) return;
 
@@ -746,6 +777,10 @@ return new Date(d.getTime() - offset * 60000)
 }
 
 async function hapusSatu(id) {
+  if (!aksesKelolaTransaksi) {
+    alert("Akun ini tidak memiliki izin menghapus transaksi.");
+    return;
+  }
   if (!confirm("Hapus transaksi ini?")) return;
 
   try {
