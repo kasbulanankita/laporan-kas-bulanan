@@ -64,6 +64,8 @@ th,td{border:1px solid #ccc}
 .container.authenticated:not(.admin) #formTransaksiCard { display:none !important; }
 #tombolHapusSemua,#tombolPulihkanOtomatis,#tombolPilihRestore { display:none !important; }
 #tombolManajemenAnggota,#adminUsersCard { display:none !important; }
+#dashboardSuperAdmin { display:none; }
+.container.authenticated.super-admin #dashboardSuperAdmin { display:block; }
 .container.authenticated:not(.admin) #tombolPulihkanOtomatis,
 .container.authenticated:not(.admin) #tombolPilihRestore {
   display: none !important;
@@ -471,6 +473,7 @@ async function mulaiSesi(user) {
     statusAutentikasi("");
   }
 
+  if (roleAktif === "super_admin") await muatDashboardSuperAdmin();
   if (roleAktif === "super_admin") $("filterKelompok").addEventListener("change",function(){dataKas=this.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===this.value);tampilkan();});
   tampilkan();
 }
