@@ -1,4 +1,4 @@
-const CACHE_NAME = "kas-uji-super-admin-v5";
+const CACHE_NAME = "kas-uji-super-admin-v6";
 const CACHE_PREFIX = "kas-uji-super-admin-";
 const FILES_TO_CACHE = ["./", "./index.html", "./manifest.json"];
 
