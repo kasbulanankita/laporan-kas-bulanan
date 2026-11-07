@@ -456,7 +456,8 @@ async function mulaiSesi(user) {
 
   roleAktif = isSuperAdmin ? "super_admin" : membership ? membership.role : "belum_bergabung";
   kelompokAktifId = membership ? membership.kelompok_id : null;
-  aksesKelolaTransaksi = isSuperAdmin ||
+  // Super Admin hanya memiliki akses baca transaksi; hak tulis hanya Admin kelompok aktif.
+  aksesKelolaTransaksi = !isSuperAdmin &&
     (roleAktif === "admin" && groupStatus && groupStatus.status === "aktif");
 
   const { data: profil, error: errorProfil } = await supabaseClient
