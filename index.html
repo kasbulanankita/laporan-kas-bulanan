@@ -13,6 +13,7 @@ header h1{margin:0 0 8px;font-size:24px}
 .card{background:white;padding:18px;border-radius:12px;margin-top:16px;box-shadow:0 2px 8px #0000000d}
 h2{font-size:18px;margin-top:0}
 input,select,button{width:100%;padding:12px;margin:6px 0;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+#namaKas.nama-kelompok-terkunci{font-weight:800;text-transform:uppercase;background:#f8fafc;color:#14532d;letter-spacing:.4px}
 button{background:#15803d;color:white;border:0;font-weight:bold;cursor:pointer}
 button.delete{background:#dc2626}
 button.export{background:#2563eb}
@@ -60,12 +61,13 @@ th,td{border:1px solid #ccc}
 .container.authenticated > #authCard {
   display: none !important;
 }
-/* Form transaksi hanya untuk Admin */
-.container.authenticated:not(.admin) #formTransaksiCard {
-  display: none !important;
-}.container.authenticated:not(.admin) #tombolHapusSemua {
-  display: none !important;
-}
+/* Hak tampilan berdasarkan keanggotaan kelompok */
+.container.authenticated:not(.admin) #formTransaksiCard { display:none !important; }
+#tombolHapusSemua,#tombolPulihkanOtomatis,#tombolPilihRestore { display:none !important; }
+.container.authenticated.super-admin #tombolManajemenAnggota,
+.container.authenticated.super-admin #adminUsersCard { display:none !important; }
+#dashboardSuperAdmin { display:none; }
+.container.authenticated.super-admin #dashboardSuperAdmin { display:block; }
 .container.authenticated:not(.admin) #tombolPulihkanOtomatis,
 .container.authenticated:not(.admin) #tombolPilihRestore {
   display: none !important;
@@ -190,15 +192,20 @@ th,td{border:1px solid #ccc}
   👥 Manajemen Anggota
 </button>
 <div id="adminUsersCard" class="card no-print">
-  <h2>Manajemen Anggota</h2>
-
-  <button type="button" onclick="muatDaftarAnggota()">
-    Muat Daftar Anggota
-  </button>
-
-  <div id="daftarAnggota">
-    <p>Tekan tombol untuk melihat daftar akun.</p>
-  </div>
+  <h2>Manajemen Anggota Kelompok</h2>
+  <p class="info">Admin hanya dapat menambahkan akun yang belum bergabung dan mengeluarkan Anggota dari kelompoknya sendiri. Penetapan Admin tetap wewenang Super Admin.</p>
+  <label for="akunBaruKelompok">Pilih akun yang belum bergabung</label>
+  <select id="akunBaruKelompok"><option value="">Memuat daftar akun...</option></select>
+  <button type="button" id="tambahAnggotaKelompok">＋ Tambahkan sebagai Anggota</button>
+  <p id="statusAnggotaKelompok" class="info"></p>
+  <h3>Anggota kelompok saat ini</h3>
+  <div id="daftarAnggota"><p>Memuat...</p></div>
+</div>
+<div id="dashboardSuperAdmin" class="card no-print">
+<h2>Dashboard Super Admin</h2><p class="info">Kelola kelompok dan tetapkan akun terdaftar sebagai Admin. Satu akun hanya dapat terdaftar pada satu kelompok.</p>
+<h3>Buat Kelompok</h3><input id="namaKelompokBaru" maxlength="80" placeholder="Nama kelompok baru"><button type="button" id="buatKelompokBtn">＋ Buat Kelompok</button>
+<h3>Penetapan Admin</h3><label for="pilihKelompokAdmin">Kelompok</label><select id="pilihKelompokAdmin"></select><label for="pilihPenggunaAdmin">Akun terdaftar</label><select id="pilihPenggunaAdmin"></select><button type="button" id="tetapkanAdminBtn">Tetapkan sebagai Admin</button>
+<p id="statusDashboard" class="info"></p><h3>Daftar Kelompok dan Anggota</h3><div id="daftarKelompokSuperAdmin">Memuat...</div>
 </div>
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
@@ -206,11 +213,11 @@ th,td{border:1px solid #ccc}
 <p style="font-size:11px;opacity:.8;margin:6px 0 0">Pemeriksaan aplikasi v3</p>
 
 <div class="no-print" style="margin-top:15px">
-    <label for="namaKas">Nama Kas / Kelompok</label>
+    <label for="namaKas">Nama Kas Regu/Kelompok</label>
     <input
         type="text"
         id="namaKas"
-        placeholder="Contoh: KAS KELOMPOK ELANG"
+        placeholder="Nama kelompok otomatis"
         style="width:100%;padding:12px;margin-top:6px"
     >
 </div>
@@ -222,7 +229,7 @@ th,td{border:1px solid #ccc}
 </header>
 
 <div class="card no-print">
-<h2>Pilih Bulan</h2>
+<h2>Filter Laporan</h2><div id="filterKelompokWrap" style="display:none"><label for="filterKelompok">Kelompok laporan</label><select id="filterKelompok"><option value="semua">Semua kelompok + pribadi</option></select></div>
 <input type="month" id="bulan">
 </div>
 
@@ -238,6 +245,7 @@ th,td{border:1px solid #ccc}
 <div id="formTransaksiCard" class="card no-print">
 <h2 id="judulForm">Tambah Transaksi</h2>
 <form id="formKas">
+<div id="kelompokTransaksiWrap" style="display:none"><label for="kelompokTransaksi">Kelompok tujuan (Super Admin)</label><select id="kelompokTransaksi"><option value="">Transaksi pribadi</option></select></div>
 <input type="date" id="tanggal" required>
 <select id="jenis" required>
 <option value="masuk">Pemasukan</option>
@@ -324,6 +332,9 @@ const supabaseClient = window.supabase.createClient(
 // Status pengguna yang sedang login
 let penggunaAktif = null;
 let roleAktif = null;
+let kelompokAktifId = null;
+let aksesKelolaTransaksi = false;
+const SUPER_ADMIN_ID = "0a88c330-e26d-462b-a914-62b17a8dc06f";
 
 // Fungsi menampilkan status autentikasi
 function statusAutentikasi(pesan) {
@@ -388,65 +399,110 @@ const password = $("passwordDaftar").value;
   await mulaiSesi(data.user);
 });
  
-// Memeriksa profil dan membuka aplikasi
+// Memeriksa keanggotaan dan membuka aplikasi sesuai peran baru
 async function mulaiSesi(user) {
-  statusAutentikasi("Memuat data transaksi...");
+  statusAutentikasi("Memeriksa keanggotaan dan memuat transaksi...");
 
-  // Ambil profil dan peran pengguna
-  const { data: profil, error: errorProfil } =
-    await supabaseClient
-      .from("profiles")
-      .select("role, username")
-      .eq("id", user.id)
-      .single();
+  const isSuperAdmin = user.id === SUPER_ADMIN_ID;
+  let membership = null;
+  let groupStatus = null;
 
-  if (errorProfil) {
-    statusAutentikasi("Gagal membaca profil: " + errorProfil.message);
-    return;
+  if (!isSuperAdmin) {
+    const { data, error } = await supabaseClient
+      .from("anggota_kelompok")
+      .select("kelompok_id, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      statusAutentikasi("Gagal membaca keanggotaan: " + error.message);
+      return;
+    }
+    membership = data;
+
+    if (membership) {
+      const { data: group, error: groupError } = await supabaseClient
+        .from("kelompok")
+        .select("status, nama")
+        .eq("id", membership.kelompok_id)
+        .maybeSingle();
+
+      if (groupError) {
+        statusAutentikasi("Gagal membaca kelompok: " + groupError.message);
+        return;
+      }
+      groupStatus = group;
+    }
   }
 
-  // Ambil transaksi dari database
-  // RLS Supabase otomatis membatasi data anggota.
-  // Admin dapat melihat seluruh transaksi.
-  const { data: transaksi, error: errorTransaksi } =
-    await supabaseClient
-      .from("transaksi")
-      .select("id, user_id, tanggal, jenis, keterangan, jumlah")
-      .order("tanggal", { ascending: true });
+  roleAktif = isSuperAdmin ? "super_admin" : membership ? membership.role : "belum_bergabung";
+  kelompokAktifId = membership ? membership.kelompok_id : null;
+  aksesKelolaTransaksi = isSuperAdmin ||
+    (roleAktif === "admin" && groupStatus && groupStatus.status === "aktif");
+
+  const { data: transaksi, error: errorTransaksi } = await supabaseClient
+    .from("transaksi")
+    .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
+    .order("tanggal", { ascending: true });
 
   if (errorTransaksi) {
-    statusAutentikasi(
-      "Gagal memuat transaksi: " + errorTransaksi.message
-    );
+    statusAutentikasi("Gagal memuat transaksi: " + errorTransaksi.message);
     return;
   }
 
-  // Ganti data tampilan dengan data dari database
-  dataKas = transaksi.map(item => ({
-    ...item,
-    jumlah: Number(item.jumlah)
-  }));
-
+  dataKasSemua = (transaksi || []).map(item => ({ ...item, jumlah: Number(item.jumlah) }));
+  dataKas = dataKasSemua.slice();
   penggunaAktif = user;
-  roleAktif = profil.role;
 
+  // Ambil username dari profil pengguna, bukan menampilkan alamat email.
+  const { data: profilPengguna } = await supabaseClient
+    .from("profiles")
+    .select("username")
+    .eq("id", user.id)
+    .maybeSingle();
   const usernamePengguna =
-    profil.username ||
+    (profilPengguna && profilPengguna.username) ||
     (user.user_metadata && user.user_metadata.username) ||
     "Pengguna";
 
-  $("infoPengguna").textContent =
-    "Username: " + usernamePengguna +
-    " | Peran: " +
-    (roleAktif === "admin" ? "Admin" : "Anggota");
+  const labelPeran = roleAktif === "super_admin" ? "Super Admin" :
+    roleAktif === "admin" ? "Admin Kelompok" :
+    roleAktif === "anggota" ? "Anggota" : "Belum bergabung dengan kelompok";
 
-  document.querySelector(".container").classList.add("authenticated");
-document.querySelector(".container").classList.toggle(
-  "admin",
-  roleAktif === "admin"
-);
-  statusAutentikasi("");
+  $("infoPengguna").textContent = "Username: " + usernamePengguna + " | Peran: " + labelPeran +
+    (groupStatus && groupStatus.nama ? " | Kelompok: " + groupStatus.nama : "");
 
+  // Nama kelompok untuk Admin dan Anggota mengikuti keanggotaan akun.
+  const inputNamaKelompok = $("namaKas");
+  const judulNamaKelompok = $("judulKas");
+  if (roleAktif === "admin" || roleAktif === "anggota") {
+    const namaKelompok = groupStatus && groupStatus.nama ? groupStatus.nama : "";
+    inputNamaKelompok.value = namaKelompok.toUpperCase();
+    inputNamaKelompok.readOnly = true;
+    inputNamaKelompok.classList.add("nama-kelompok-terkunci");
+    judulNamaKelompok.textContent = namaKelompok ? namaKelompok.toUpperCase() : "Laporan Kas Bulanan";
+  } else {
+    inputNamaKelompok.readOnly = false;
+    inputNamaKelompok.classList.remove("nama-kelompok-terkunci");
+    inputNamaKelompok.value = localStorage.getItem("namaKas") || "";
+    judulNamaKelompok.textContent = inputNamaKelompok.value.trim() || "Laporan Kas Bulanan";
+  }
+
+  const container = document.querySelector(".container");
+  container.classList.add("authenticated");
+  container.classList.toggle("admin", aksesKelolaTransaksi);
+  container.classList.toggle("super-admin", isSuperAdmin);
+
+  if (roleAktif === "belum_bergabung") {
+    statusAutentikasi("Akun berhasil masuk. Anda belum ditambahkan ke kelompok oleh Super Admin.");
+  } else if (roleAktif === "admin" && !aksesKelolaTransaksi) {
+    statusAutentikasi("Kelompok sedang diarsipkan. Laporan tetap dapat dilihat, tetapi transaksi tidak dapat diubah.");
+  } else {
+    statusAutentikasi("");
+  }
+
+  if (roleAktif === "super_admin") await muatDashboardSuperAdmin();
+  if (roleAktif === "super_admin") $("filterKelompok").addEventListener("change",function(){dataKas=this.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===this.value);tampilkan();});
   tampilkan();
 }
 
@@ -463,8 +519,10 @@ $("tombolLogout").addEventListener("click", async function() {
 
   penggunaAktif = null;
   roleAktif = null;
+  kelompokAktifId = null;
+  aksesKelolaTransaksi = false;
 
-  document.querySelector(".container").classList.remove("authenticated");
+  document.querySelector(".container").classList.remove("authenticated", "admin", "super-admin");
 
   $("infoPengguna").textContent = "";
   $("formLogin").reset();
@@ -476,6 +534,7 @@ $("tombolLogout").addEventListener("click", async function() {
 // Membaca data dengan aman agar kesalahan format penyimpanan
 // tidak menghentikan seluruh JavaScript aplikasi.
 let dataKas = [];
+let dataKasSemua = [];
 let masalahBacaData = "";
 try {
   const dataTersimpan = localStorage.getItem("dataKasBulanan");
@@ -608,7 +667,7 @@ td.className = x.jenis === "masuk" ? "income" : "expense";
 tr.appendChild(td);
 });
 
-if (roleAktif === "admin") {
+if (aksesKelolaTransaksi) {
   const td = document.createElement("td");
   td.className = "actions no-print";
 
@@ -634,6 +693,11 @@ $("daftarKas").appendChild(tr);
 
 $("formKas").addEventListener("submit", async e => {
   e.preventDefault();
+
+  if (!aksesKelolaTransaksi || !penggunaAktif) {
+    alert("Akun ini tidak memiliki izin untuk mengubah transaksi.");
+    return;
+  }
 
   const transaksi = {
     tanggal: $("tanggal").value,
@@ -661,7 +725,7 @@ $("formKas").addEventListener("submit", async e => {
         .from("transaksi")
         .update(transaksi)
         .eq("id", idEdit)
-        .select("id, tanggal, jenis, keterangan, jumlah")
+        .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
         .single();
 
       if (error) throw error;
@@ -675,24 +739,23 @@ $("formKas").addEventListener("submit", async e => {
 
       if (index !== -1) {
         dataKas[index] = hasil;
-      } else {
-        dataKas.push(hasil);
-      }
+        const allIndex = dataKasSemua.findIndex(x => x.id === idEdit);
+        if (allIndex !== -1) dataKasSemua[allIndex] = hasil;
+      } else { dataKas.push(hasil); dataKasSemua.push(hasil); }
 
     } else {
       // Menambahkan transaksi baru ke Supabase
       const { data, error } = await supabaseClient
         .from("transaksi")
-        .insert(transaksi)
-        .select("id, tanggal, jenis, keterangan, jumlah")
+        .insert({ ...transaksi, user_id: penggunaAktif.id, kelompok_id: roleAktif === "super_admin" ? ($("kelompokTransaksi").value || null) : kelompokAktifId })
+        .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
         .single();
 
       if (error) throw error;
 
-      dataKas.push({
-        ...data,
-        jumlah: Number(data.jumlah)
-      });
+      const inserted = { ...data, jumlah: Number(data.jumlah) };
+      dataKas.push(inserted);
+      dataKasSemua.push(inserted);
     }
 
     // Backup lokal setelah penyimpanan online berhasil
@@ -719,6 +782,7 @@ $("formKas").addEventListener("submit", async e => {
 
 
 function mulaiEdit(id){
+if (!aksesKelolaTransaksi) return;
 const x = dataKas.find(item => item.id === id);
 if(!x) return;
 
@@ -751,6 +815,10 @@ return new Date(d.getTime() - offset * 60000)
 }
 
 async function hapusSatu(id) {
+  if (!aksesKelolaTransaksi) {
+    alert("Akun ini tidak memiliki izin menghapus transaksi.");
+    return;
+  }
   if (!confirm("Hapus transaksi ini?")) return;
 
   try {
@@ -762,6 +830,7 @@ async function hapusSatu(id) {
     if (error) throw error;
 
     dataKas = dataKas.filter(x => x.id !== id);
+    dataKasSemua = dataKasSemua.filter(x => x.id !== id);
 
     simpan();
 
@@ -1440,113 +1509,103 @@ window.addEventListener("appinstalled", () => {
   installButton.style.display = "none";
   deferredPrompt = null;
 });
+
+async function muatDashboardSuperAdmin(){
+ if(roleAktif!=="super_admin")return;
+ const status=$("statusDashboard"),daftar=$("daftarKelompokSuperAdmin");status.textContent="Memuat kelompok dan akun...";
+ try{
+ const [gr,pr,mr]=await Promise.all([
+ supabaseClient.from("kelompok").select("id,nama,status,created_at").order("created_at"),
+ supabaseClient.from("profiles").select("id,username,created_at").order("created_at"),
+ supabaseClient.from("anggota_kelompok").select("kelompok_id,user_id,role")]);
+ if(gr.error)throw gr.error;if(pr.error)throw pr.error;if(mr.error)throw mr.error;
+ const groups=gr.data||[],profiles=(pr.data||[]).filter(p=>p.id!==SUPER_ADMIN_ID),members=mr.data||[],byId=new Map(profiles.map(p=>[p.id,p]));
+ const gs=$("pilihKelompokAdmin");gs.replaceChildren();groups.forEach(g=>{const opt=new Option(g.nama+(g.status==="arsip"?" (Arsip)":""),g.id);opt.disabled=g.status==="arsip";gs.add(opt);});if(!groups.length)gs.add(new Option("Belum ada kelompok",""));
+ const us=$("pilihPenggunaAdmin");us.replaceChildren();profiles.forEach(p=>{const m=members.find(x=>x.user_id===p.id);us.add(new Option((p.username||p.id.slice(0,8))+(m?" — "+(groups.find(g=>g.id===m.kelompok_id)?.nama||"kelompok")+" ("+m.role+")":" — belum bergabung"),p.id));});if(!profiles.length)us.add(new Option("Belum ada akun",""));
+ daftar.replaceChildren();if(!groups.length)daftar.textContent="Belum ada kelompok.";
+ groups.forEach(g=>{
+ const card=document.createElement("section");card.style.cssText="padding:12px;border:1px solid #e2e8f0;border-radius:10px;margin:10px 0";
+ const title=document.createElement("strong");title.textContent=g.nama;const info=document.createElement("p");info.className="info";const gm=members.filter(m=>m.kelompok_id===g.id);info.textContent="Status: "+g.status+" | Jumlah anggota: "+gm.length;
+ const toggle=document.createElement("button");toggle.type="button";toggle.className=g.status==="aktif"?"cancel":"edit";toggle.textContent=g.status==="aktif"?"Arsipkan Kelompok":"Aktifkan Kembali";toggle.onclick=()=>ubahStatusKelompok(g.id,g.status==="aktif"?"arsip":"aktif");card.append(title,info,toggle);
+ gm.forEach(m=>{const row=document.createElement("div");row.style.cssText="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #eee;padding:8px 0";const name=document.createElement("span");name.style.flex="1";name.textContent=(byId.get(m.user_id)?.username||m.user_id.slice(0,8))+" — "+m.role;const sel=document.createElement("select");sel.style.width="auto";sel.add(new Option("Admin","admin"));sel.add(new Option("Anggota","anggota"));sel.value=m.role;const save=document.createElement("button");save.type="button";save.style.width="auto";save.textContent="Ubah";save.onclick=()=>ubahRoleKeanggotaan(g.id,m.user_id,sel.value);const del=document.createElement("button");del.type="button";del.className="delete";del.style.width="auto";del.textContent="Keluarkan";del.onclick=()=>hapusKeanggotaan(g.id,m.user_id);row.append(name,sel,save,del);card.appendChild(row);});daftar.appendChild(card);
+ });
+ $("filterKelompokWrap").style.display="block";const filter=$("filterKelompok"),old=filter.value||"semua";filter.replaceChildren(new Option("Semua kelompok + pribadi","semua"));groups.forEach(g=>filter.add(new Option(g.nama,g.id)));filter.value=[...filter.options].some(o=>o.value===old)?old:"semua";dataKas=filter.value==="semua"?dataKasSemua.slice():dataKasSemua.filter(x=>x.kelompok_id===filter.value);
+ $("kelompokTransaksiWrap").style.display="block";const tx=$("kelompokTransaksi"),oldTx=tx.value;tx.replaceChildren(new Option("Transaksi pribadi",""));groups.filter(g=>g.status==="aktif").forEach(g=>tx.add(new Option(g.nama,g.id)));if([...tx.options].some(o=>o.value===oldTx))tx.value=oldTx;
+ status.textContent="Dashboard siap. Penetapan Admin hanya dilakukan Super Admin.";
+ }catch(e){status.textContent="Gagal memuat dashboard: "+e.message;}
+}
+async function buatKelompokBaru(){if(roleAktif!=="super_admin"||!penggunaAktif)return;const nama=$("namaKelompokBaru").value.trim();if(!nama){$("statusDashboard").textContent="Masukkan nama kelompok.";return;}const {error}=await supabaseClient.from("kelompok").insert({nama,dibuat_oleh:penggunaAktif.id});if(error){$("statusDashboard").textContent="Gagal membuat kelompok: "+error.message;return;}$("namaKelompokBaru").value="";await muatDashboardSuperAdmin();}
+async function tetapkanAdminKelompok(){if(roleAktif!=="super_admin")return;const gid=$("pilihKelompokAdmin").value,uid=$("pilihPenggunaAdmin").value;if(!gid||!uid){$("statusDashboard").textContent="Pilih kelompok aktif dan akun.";return;}const {data:targetGroup,error:groupError}=await supabaseClient.from("kelompok").select("status").eq("id",gid).single();if(groupError||targetGroup.status!=="aktif"){$("statusDashboard").textContent="Admin hanya dapat ditetapkan pada kelompok aktif.";return;}if(!confirm("Tetapkan akun ini sebagai Admin? Jika sudah menjadi anggota kelompok lain, akun akan dipindahkan."))return;const {data:old,error:readError}=await supabaseClient.from("anggota_kelompok").select("kelompok_id").eq("user_id",uid).maybeSingle();if(readError){$("statusDashboard").textContent=readError.message;return;}const result=old?await supabaseClient.from("anggota_kelompok").update({kelompok_id:gid,role:"admin"}).eq("user_id",uid):await supabaseClient.from("anggota_kelompok").insert({kelompok_id:gid,user_id:uid,role:"admin"});if(result.error){$("statusDashboard").textContent="Gagal menetapkan Admin: "+result.error.message;return;}await muatDashboardSuperAdmin();}
+async function ubahRoleKeanggotaan(gid,uid,role){if(roleAktif!=="super_admin")return;const {error}=await supabaseClient.from("anggota_kelompok").update({role}).eq("kelompok_id",gid).eq("user_id",uid);if(error){$("statusDashboard").textContent="Gagal mengubah peran: "+error.message;return;}await muatDashboardSuperAdmin();}
+async function hapusKeanggotaan(gid,uid){if(roleAktif!=="super_admin"||!confirm("Keluarkan akun dari kelompok? Riwayat transaksi tetap tersimpan."))return;const {error}=await supabaseClient.from("anggota_kelompok").delete().eq("kelompok_id",gid).eq("user_id",uid);if(error){$("statusDashboard").textContent="Gagal mengeluarkan anggota: "+error.message;return;}await muatDashboardSuperAdmin();}
+async function ubahStatusKelompok(id,statusBaru){if(roleAktif!=="super_admin"||!confirm("Ubah status kelompok menjadi "+statusBaru+"? Riwayat transaksi tetap disimpan."))return;const {error}=await supabaseClient.from("kelompok").update({status:statusBaru}).eq("id",id);if(error){$("statusDashboard").textContent="Gagal mengubah status: "+error.message;return;}await muatDashboardSuperAdmin();}
+$("buatKelompokBtn").addEventListener("click",buatKelompokBaru);$("tetapkanAdminBtn").addEventListener("click",tetapkanAdminKelompok);
 function toggleManajemenAnggota() {
+  if (roleAktif !== "admin" || !aksesKelolaTransaksi) return;
   const panel = document.getElementById("adminUsersCard");
-
   panel.classList.toggle("terbuka");
+  if (panel.classList.contains("terbuka")) muatDaftarAnggota();
 }
+
 async function muatDaftarAnggota() {
-  const wadah = document.getElementById("daftarAnggota");
-
-  if (roleAktif !== "admin") {
-    alert("Hanya Admin yang boleh melihat daftar anggota.");
+  if (roleAktif !== "admin" || !kelompokAktifId) {
+    alert("Fitur ini hanya untuk Admin kelompok.");
     return;
   }
-
-  wadah.textContent = "Memuat daftar anggota...";
-
+  const wadah=$("daftarAnggota"), pilihan=$("akunBaruKelompok"), status=$("statusAnggotaKelompok");
+  wadah.textContent="Memuat anggota kelompok...";
+  pilihan.replaceChildren(new Option("Memuat akun yang tersedia...",""));
+  status.textContent="";
   try {
-    const { data, error } = await supabaseClient.rpc(
-      "admin_list_users"
-    );
-
-    if (error) throw error;
-
-    wadah.innerHTML = "";
-
-    if (!data || data.length === 0) {
-      wadah.textContent = "Belum ada akun terdaftar.";
-      return;
-    }
-
-    data.forEach(anggota => {
-      const baris = document.createElement("div");
-      baris.style.padding = "12px";
-      baris.style.borderBottom = "1px solid #ddd";
-
-      const username = document.createElement("p");
-username.textContent = "Username: " + anggota.username;
-
-      const peran = document.createElement("p");
-      peran.textContent =
-        "Peran saat ini: " +
-        (anggota.role === "admin" ? "Admin" : "Anggota");
-
-      const pilihan = document.createElement("select");
-
-      pilihan.innerHTML = `
-        <option value="user">Anggota</option>
-        <option value="admin">Admin</option>
-      `;
-
-      pilihan.value = anggota.role;
-
-      const tombol = document.createElement("button");
-      tombol.type = "button";
-      tombol.textContent = "Simpan Perubahan";
-
-      const akunSendiri =
-  penggunaAktif && anggota.id === penggunaAktif.id;
-
-if (akunSendiri) {
-  pilihan.disabled = true;
-        tombol.disabled = true;
-        tombol.textContent = "Akun Anda";
-      } else {
-        tombol.onclick = () => {
-          ubahPeranAnggota(anggota.id, pilihan.value);
-        };
+    const {data,error}=await supabaseClient.rpc("group_admin_list_people");
+    if(error)throw error;
+    const people=data||[];
+    const members=people.filter(p=>p.membership_role);
+    const candidates=people.filter(p=>!p.membership_role);
+    pilihan.replaceChildren(new Option(candidates.length?"Pilih akun yang belum bergabung":"Tidak ada akun tersedia",""));
+    candidates.forEach(p=>pilihan.add(new Option(p.username||p.id.slice(0,8),p.id)));
+    wadah.replaceChildren();
+    if(!members.length)wadah.textContent="Belum ada anggota.";
+    members.forEach(p=>{
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #e2e8f0";
+      const label=document.createElement("span");
+      label.style.flex="1";
+      label.textContent=(p.username||p.id.slice(0,8))+" — "+(p.membership_role==="admin"?"Admin kelompok":"Anggota");
+      row.appendChild(label);
+      if(p.membership_role==="anggota"){
+        const remove=document.createElement("button");
+        remove.type="button";remove.className="delete";remove.style.width="auto";
+        remove.textContent="Keluarkan";
+        remove.addEventListener("click",()=>keluarkanAnggotaKelompok(p.id,p.username));
+        row.appendChild(remove);
       }
-
-      baris.appendChild(username);
-      baris.appendChild(peran);
-      baris.appendChild(pilihan);
-      baris.appendChild(tombol);
-
-      wadah.appendChild(baris);
+      wadah.appendChild(row);
     });
-
-  } catch (error) {
-    wadah.textContent =
-      "Gagal memuat anggota: " + error.message;
+  } catch(error) {
+    wadah.textContent="Gagal memuat anggota: "+error.message;
+    status.textContent="Pastikan fungsi group_admin_list_people sudah dibuat di Supabase.";
   }
 }
-async function ubahPeranAnggota(id, peran) {
-  if (roleAktif !== "admin") {
-    alert("Hanya Admin yang boleh mengubah peran.");
-    return;
-  }
-
-  if (!confirm("Yakin ingin mengubah peran akun ini?")) {
-    return;
-  }
-
-  const { error } = await supabaseClient.rpc(
-    "admin_set_profile_role",
-    {
-      p_target_user_id: id,
-      p_new_role: peran
-    }
-  );
-
-  if (error) {
-    alert("Gagal mengubah peran: " + error.message);
-    return;
-  }
-
-  alert("Peran anggota berhasil diperbarui.");
+async function tambahAnggotaKelompok(){
+  if(roleAktif!=="admin"||!aksesKelolaTransaksi||!kelompokAktifId)return;
+  const uid=$("akunBaruKelompok").value;
+  if(!uid){$("statusAnggotaKelompok").textContent="Pilih akun terlebih dahulu.";return;}
+  if(!confirm("Tambahkan akun ini sebagai Anggota kelompok Anda?"))return;
+  const {error}=await supabaseClient.from("anggota_kelompok").insert({kelompok_id:kelompokAktifId,user_id:uid,role:"anggota"});
+  if(error){$("statusAnggotaKelompok").textContent="Gagal menambahkan anggota: "+error.message;return;}
+  $("statusAnggotaKelompok").textContent="Anggota berhasil ditambahkan.";
   await muatDaftarAnggota();
 }
+async function keluarkanAnggotaKelompok(uid,username){
+  if(roleAktif!=="admin"||!aksesKelolaTransaksi||!kelompokAktifId)return;
+  if(!confirm("Keluarkan "+(username||"akun ini")+" dari kelompok? Riwayat transaksinya tetap tersimpan."))return;
+  const {error}=await supabaseClient.from("anggota_kelompok").delete().eq("kelompok_id",kelompokAktifId).eq("user_id",uid).eq("role","anggota");
+  if(error){$("statusAnggotaKelompok").textContent="Gagal mengeluarkan anggota: "+error.message;return;}
+  $("statusAnggotaKelompok").textContent="Anggota berhasil dikeluarkan.";
+  await muatDaftarAnggota();
+}
+$("tambahAnggotaKelompok").addEventListener("click",tambahAnggotaKelompok);
 </script>
 </body>
 </html>
