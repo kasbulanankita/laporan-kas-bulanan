@@ -68,6 +68,7 @@ th,td{border:1px solid #ccc}
 .container.authenticated.super-admin #adminUsersCard { display:none !important; }
 #dashboardSuperAdmin { display:none; }
 .container.authenticated.super-admin #dashboardSuperAdmin { display:block; }
+.dashboard-toggle{display:flex;justify-content:space-between;align-items:center;text-align:left;background:#f1f5f9;color:#14532d;margin:0;font-size:16px;}
 .container.authenticated:not(.admin) #tombolPulihkanOtomatis,
 .container.authenticated:not(.admin) #tombolPilihRestore {
   display: none !important;
@@ -202,10 +203,13 @@ th,td{border:1px solid #ccc}
   <div id="daftarAnggota"><p>Memuat...</p></div>
 </div>
 <div id="dashboardSuperAdmin" class="card no-print">
-<h2>Dashboard Super Admin</h2><p class="info">Kelola kelompok dan tetapkan akun terdaftar sebagai Admin. Satu akun hanya dapat terdaftar pada satu kelompok.</p>
+<button type="button" id="toggleDashboardSuperAdmin" class="dashboard-toggle" onclick="toggleDashboardSuperAdmin()" aria-expanded="false">🛡️ Dashboard Super Admin <span id="ikonDashboardSuperAdmin">＋</span></button>
+<div id="isiDashboardSuperAdmin" style="display:none">
+<p class="info">Kelola kelompok dan tetapkan akun terdaftar sebagai Admin. Satu akun hanya dapat terdaftar pada satu kelompok.</p>
 <h3>Buat Kelompok</h3><input id="namaKelompokBaru" maxlength="80" placeholder="Nama kelompok baru"><button type="button" id="buatKelompokBtn">＋ Buat Kelompok</button>
 <h3>Penetapan Admin</h3><label for="pilihKelompokAdmin">Kelompok</label><select id="pilihKelompokAdmin"></select><label for="pilihPenggunaAdmin">Akun terdaftar</label><select id="pilihPenggunaAdmin"></select><button type="button" id="tetapkanAdminBtn">Tetapkan sebagai Admin</button>
 <p id="statusDashboard" class="info"></p><h3>Daftar Kelompok dan Anggota</h3><div id="daftarKelompokSuperAdmin">Memuat...</div>
+</div>
 </div>
 <header>
 <h1 id="judulKas">Laporan Kas Bulanan</h1>
@@ -1540,6 +1544,17 @@ async function ubahRoleKeanggotaan(gid,uid,role){if(roleAktif!=="super_admin")re
 async function hapusKeanggotaan(gid,uid){if(roleAktif!=="super_admin"||!confirm("Keluarkan akun dari kelompok? Riwayat transaksi tetap tersimpan."))return;const {error}=await supabaseClient.from("anggota_kelompok").delete().eq("kelompok_id",gid).eq("user_id",uid);if(error){$("statusDashboard").textContent="Gagal mengeluarkan anggota: "+error.message;return;}await muatDashboardSuperAdmin();}
 async function ubahStatusKelompok(id,statusBaru){if(roleAktif!=="super_admin"||!confirm("Ubah status kelompok menjadi "+statusBaru+"? Riwayat transaksi tetap disimpan."))return;const {error}=await supabaseClient.from("kelompok").update({status:statusBaru}).eq("id",id);if(error){$("statusDashboard").textContent="Gagal mengubah status: "+error.message;return;}await muatDashboardSuperAdmin();}
 $("buatKelompokBtn").addEventListener("click",buatKelompokBaru);$("tetapkanAdminBtn").addEventListener("click",tetapkanAdminKelompok);
+function toggleDashboardSuperAdmin() {
+  if (roleAktif !== "super_admin") return;
+  const isi = document.getElementById("isiDashboardSuperAdmin");
+  const tombol = document.getElementById("toggleDashboardSuperAdmin");
+  const ikon = document.getElementById("ikonDashboardSuperAdmin");
+  const terbuka = isi.style.display !== "none";
+  isi.style.display = terbuka ? "none" : "block";
+  tombol.setAttribute("aria-expanded", String(!terbuka));
+  ikon.textContent = terbuka ? "＋" : "－";
+}
+
 function toggleManajemenAnggota() {
   if (roleAktif !== "admin" || !aksesKelolaTransaksi) return;
   const panel = document.getElementById("adminUsersCard");
