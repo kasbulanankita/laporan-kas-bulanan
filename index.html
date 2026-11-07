@@ -95,11 +95,18 @@ th,td{border:1px solid #ccc}
   z-index: 2;
 }
 /* Menu Manajemen Anggota hanya untuk Admin */
+#tombolManajemenAnggota {
+  display: none;
+}
 #adminUsersCard {
   display: none;
 }
 
-.container.authenticated.admin #adminUsersCard {
+.container.authenticated.admin #tombolManajemenAnggota {
+  display: block;
+}
+
+.container.authenticated.admin #adminUsersCard.terbuka {
   display: block;
 }
 </style>
@@ -174,6 +181,14 @@ th,td{border:1px solid #ccc}
     Logout
   </button>
 </div>
+<button
+  type="button"
+  id="tombolManajemenAnggota"
+  onclick="toggleManajemenAnggota()"
+  class="no-print"
+>
+  👥 Manajemen Anggota
+</button>
 <div id="adminUsersCard" class="card no-print">
   <h2>Manajemen Anggota</h2>
 
@@ -1420,6 +1435,11 @@ window.addEventListener("appinstalled", () => {
   installButton.style.display = "none";
   deferredPrompt = null;
 });
+function toggleManajemenAnggota() {
+  const panel = document.getElementById("adminUsersCard");
+
+  panel.classList.toggle("terbuka");
+}
 async function muatDaftarAnggota() {
   const wadah = document.getElementById("daftarAnggota");
 
