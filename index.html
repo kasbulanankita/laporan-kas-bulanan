@@ -1004,7 +1004,8 @@ function eksporCSV(){
 function backupData(){
 const cadangan = {
 aplikasi:"Laporan Kas Bulanan",
-versi:1,
+versi:2,
+kelompok_id: kelompokAktifId,
 tanggalBackup:new Date().toISOString(),
 transaksi:dataKas
 };
@@ -1024,13 +1025,14 @@ URL.revokeObjectURL(url);
 alert("File backup berhasil dibuat. Simpan file tersebut di tempat yang aman.");
 }
 async function pulihkanTransaksiKeSupabase(transaksi) {
-  if (roleAktif !== "admin") {
-    throw new Error("Hanya Admin yang boleh melakukan Restore.");
+  if (!aksesKelolaTransaksi || !kelompokAktifId) {
+    throw new Error("Hanya Admin kelompok aktif yang boleh melakukan Restore.");
   }
 
   const { error: errorRestore } = await supabaseClient.rpc(
     "admin_restore_transaksi",
     {
+      p_kelompok_id: kelompokAktifId,
       p_transaksi: transaksi
     }
   );
@@ -1039,23 +1041,25 @@ async function pulihkanTransaksiKeSupabase(transaksi) {
 
   const { data, error } = await supabaseClient
     .from("transaksi")
-    .select("id, user_id, tanggal, jenis, keterangan, jumlah")
+    .select("id, user_id, kelompok_id, tanggal, jenis, keterangan, jumlah")
+    .eq("kelompok_id", kelompokAktifId)
     .order("tanggal", { ascending: true });
 
   if (error) throw error;
 
-  dataKas = data.map(item => ({
+  dataKasSemua = (data || []).map(item => ({
     ...item,
     jumlah: Number(item.jumlah)
   }));
+  dataKas = dataKasSemua.slice();
 
   simpan();
   batalEdit();
   tampilkan();
   tampilkanStatusBackup();
 }
-async function pulihkanBackupOtomatis(){  if (roleAktif !== "admin") {
-    alert("Maaf, hanya Admin yang boleh memulihkan backup.");
+async function pulihkanBackupOtomatis(){  if (!aksesKelolaTransaksi || !kelompokAktifId) {
+    alert("Maaf, hanya Admin kelompok aktif yang boleh memulihkan backup.");
     return;
   }
   const backup = localStorage.getItem("backupOtomatisKas");
@@ -1066,7 +1070,7 @@ async function pulihkanBackupOtomatis(){  if (roleAktif !== "admin") {
   }
 
   if(!confirm(
-    "Pulihkan backup otomatis? Semua data saat ini akan diganti dengan data backup."
+    "Pulihkan backup otomatis? Hanya transaksi kelompok ini yang akan diganti."
   )){
     return;
   }
@@ -1399,8 +1403,8 @@ function simpanLaporanGambar(){
           }
         
   
-function restoreData(event){if (roleAktif !== "admin") {
-  alert("Maaf, hanya Admin yang boleh melakukan Restore.");
+function restoreData(event){if (!aksesKelolaTransaksi || !kelompokAktifId) {
+  alert("Maaf, hanya Admin kelompok aktif yang boleh melakukan Restore.");
   event.target.value = "";
   return;
 }
@@ -1437,9 +1441,13 @@ if(!valid){
 throw new Error("Ada data transaksi yang tidak valid.");
 }
 
+if (cadangan.kelompok_id && cadangan.kelompok_id !== kelompokAktifId) {
+  throw new Error("File backup ini berasal dari kelompok yang berbeda.");
+}
+
 if(!confirm(
 "File berisi " + cadangan.transaksi.length +
-" transaksi. Restore akan mengganti semua data saat ini. Lanjutkan?"
+" transaksi. Restore hanya akan mengganti transaksi kelompok Anda. Lanjutkan?"
 )){
 return;
 }
