@@ -1441,8 +1441,8 @@ if(!valid){
 throw new Error("Ada data transaksi yang tidak valid.");
 }
 
-if (cadangan.kelompok_id && cadangan.kelompok_id !== kelompokAktifId) {
-  throw new Error("File backup ini berasal dari kelompok yang berbeda.");
+if (cadangan.versi !== 2 || cadangan.kelompok_id !== kelompokAktifId) {
+  throw new Error("File backup harus versi 2 dan berasal dari kelompok aktif Anda.");
 }
 
 if(!confirm(
